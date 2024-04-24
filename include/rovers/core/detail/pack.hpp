@@ -14,17 +14,17 @@
 namespace rovers {
 
 struct AgentPack {
-    AgentPack(const Agent& agent, const std::vector<Agent>& agents,
+    AgentPack(int agent_index, const std::vector<Agent>& agents,
               const std::vector<Entity>& entities)
-        : agent(agent), agents(agents), entities(entities) {}
-    Agent agent;
+        : agent_index(agent_index), agents(agents), entities(entities) {}
+    int agent_index;
     std::vector<Agent> agents;
     std::vector<Entity> entities;
 };
 
-AgentPack from_filter(const AgentPack& pack, std::function<bool(const Agent&)> predicate) {
-    return {pack.agent, thyme::utilities::filter(pack.agents, predicate), pack.entities};
-}
+// AgentPack from_filter(const AgentPack& pack, std::function<bool(const Agent&)> predicate) {
+//     return {pack.agent, thyme::utilities::filter(pack.agents, predicate), pack.entities};
+// }
 
 struct EntityPack {
     EntityPack(const Entity& entity, const std::vector<Agent>& agents,

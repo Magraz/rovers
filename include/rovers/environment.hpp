@@ -85,9 +85,11 @@ class Environment {
         // observations and rewards
         State state;
         Reward rewards;
-        for (auto& r : m_rovers) {
-            state.push_back(r->scan({r, m_rovers, m_pois}));
-            rewards.push_back(r->reward({r, m_rovers, m_pois}));
+        for (int i = 0; i < m_rovers.size(); ++i) {
+            // Construct the AgentPack on the fly
+            const AgentPack pack = {i, m_rovers, m_pois};
+            state.push_back(m_rovers[i]->scan(pack));
+            rewards.push_back(m_rovers[i]->reward(pack));
         }
         return {state, rewards};
     }
