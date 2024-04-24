@@ -62,7 +62,7 @@ class Lidar {
     [[nodiscard]] Eigen::MatrixXd scan(const AgentPack& pack) const {
         const std::size_t num_sectors = 360 / m_resolution;
         std::vector<std::vector<double>> poi_values(num_sectors), rover_values(num_sectors);
-        auto& rover = pack.agent;  // convenient handle
+        auto& rover = pack.agents[pack.agent_index];  // convenient handle
 
         // observe pois
         for (const auto& sensed_poi : pack.entities) {
@@ -76,9 +76,11 @@ class Lidar {
         }
 
         // observe rovers
-        for (const auto& sensed_rover : pack.agents) {
-            if (&sensed_rover == &rover) continue;
+        for (int i = 0; i < pack.agents.size(); ++i) {
+            // Do not observe yourself
+            if (i == pack.agent_index) continue;
 
+            auto& sensed_rover = pack.agents[i];  //convenient handle
             auto [angle, distance] = thyme::math::l2a(rover->position(), sensed_rover->position());
             if (distance > rover->obs_radius()) continue;
 
@@ -89,12 +91,14 @@ class Lidar {
         // encode state
         Eigen::MatrixXd state(num_sectors * 2, 1);
 
+        // For each sector
         for (std::size_t i = 0; i < num_sectors; ++i) {
             const std::size_t& num_rovers = rover_values[i].size();
             const std::size_t& num_poi = poi_values[i].size();
             state(i) = state(num_sectors + i) = -1.0;
 
-            if (num_rovers > 0) state(i) = m_composition->compose(rover_values[i], 0.0, num_rovers);
+            if (num_rovers > 0) 
+                state(i) = m_composition->compose(rover_values[i], 0.0, num_rovers);
             if (num_poi > 0)
                 state(num_sectors + i) = m_composition->compose(poi_values[i], 0.0, num_poi);
         }

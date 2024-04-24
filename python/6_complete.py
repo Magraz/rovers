@@ -339,7 +339,6 @@ def learn(state, action, next_state, reward):
 
 
 
-
 """
 ================================================================================
 Running n steps
@@ -351,10 +350,20 @@ policies = [GreedyPolicy() for agent in agents]
 states, _ = env.reset()
 steps = 1000
 for s in tqdm(range(steps)):
+    
+    actions = []
+    for i in range(len(agents)):
+        action = rovers.tensor([policies[i].sample(get_values_from_pytorch(states[i])), 
+                               policies[i].sample(get_values_from_pytorch(states[i]))])
+        actions.append(action)
+    '''
     actions = [
-        policies[i].sample(get_values_from_pytorch(states[i])) for i in range(len(agents))
+        policies[i].sample(get_values_from_pytorch(states[i])))
     ]
+    '''
+    
     old_states = states
+    print ("actions: ", actions)
     states, rewards = env.step(actions)
 
     for i in range(len(agents)):
