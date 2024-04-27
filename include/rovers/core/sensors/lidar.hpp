@@ -70,7 +70,9 @@ class Lidar {
             auto [angle, distance] = thyme::math::l2a(rover->position(), sensed_poi->position());
             if (distance > rover->obs_radius()) continue;
 
-            int sector = angle / m_resolution;
+            int sector;
+            if (angle < 360.0) sector = angle / m_resolution;
+            else sector = 0;
             poi_values[sector].push_back(sensed_poi->value() /
                                          std::max(0.001, distance * distance));
         }
@@ -84,7 +86,9 @@ class Lidar {
             auto [angle, distance] = thyme::math::l2a(rover->position(), sensed_rover->position());
             if (distance > rover->obs_radius()) continue;
 
-            int sector = angle / m_resolution;
+            int sector;
+            if (angle < 360.0) sector = angle / m_resolution;
+            else sector = 0;
             rover_values[sector].push_back(1.0 / std::max(0.001, distance * distance));
         }
 
@@ -97,7 +101,7 @@ class Lidar {
             const std::size_t& num_poi = poi_values[i].size();
             state(i) = state(num_sectors + i) = -1.0;
 
-            if (num_rovers > 0) 
+            if (num_rovers > 0)
                 state(i) = m_composition->compose(rover_values[i], 0.0, num_rovers);
             if (num_poi > 0)
                 state(num_sectors + i) = m_composition->compose(poi_values[i], 0.0, num_poi);
