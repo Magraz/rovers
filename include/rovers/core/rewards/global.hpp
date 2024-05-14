@@ -17,13 +17,15 @@ class Global {
         // TODO Keep filtering over this view for speed-up
         double reward = 0.0;
         for (const auto& poi : pack.entities) {
-            if (poi->observed()) continue;
+            // if (poi->observed()) continue;
 
             if (poi->constraint_satisfied({poi, pack.agents, pack.entities})) {
-                poi->set_observed(true);  // TDDO emit signal to POI instead.
+                // poi->set_observed(true);  // TDDO emit signal to POI instead.
                 reward += poi->value();
             }
         }
+        // reset pois
+        // for (const auto& poi : pack.entities) poi->set_observed(false);
         return reward;
     }
 };
