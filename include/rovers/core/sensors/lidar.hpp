@@ -7,6 +7,7 @@
 #include <rovers/core/poi/poi.hpp>
 #include <rovers/core/rover/rover.hpp>
 #include <rovers/utilities/math/norms.hpp>
+#include <rovers/core/sensors/isensor.hpp>
 // #include <ranges> // changed for python branch
 #include <vector>
 
@@ -52,7 +53,7 @@ class ISensorComposition {
  *
  */
 template <typename CompositionPolicy = Density>
-class Lidar {
+class Lidar : public ISensor {
     using CPolicy = thyme::utilities::SharedWrap<CompositionPolicy>;
 
    public:
