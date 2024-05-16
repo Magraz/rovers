@@ -16,7 +16,7 @@ class TypeConstraint {
    public:
     explicit TypeConstraint(size_t count = 3) : count_constraint(count) {}
 
-    [[nodiscard]] bool is_satisfied(const EntityPack& entity_pack) const {
+    [[nodiscard]] double is_satisfied(const EntityPack& entity_pack) const {
         size_t count = 0;
         for (const auto& rover : entity_pack.agents) {
             double dist = l2_norm(rover->position(), entity_pack.entity->position());

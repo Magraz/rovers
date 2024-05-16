@@ -36,7 +36,7 @@ class IPOI {
         tick();
     }
 
-    [[nodiscard]] virtual bool constraint_satisfied(const EntityPack&) const = 0;
+    [[nodiscard]] virtual double constraint_satisfied(const EntityPack&) const = 0;
 
    protected:
     virtual void tick() {}
@@ -61,7 +61,7 @@ class POI final : public IPOI {
         ConstraintPolicy constraint = ConstraintPolicy())
         : IPOI(value, obs_radius), m_constraint(constraint) {}
 
-    [[nodiscard]] bool constraint_satisfied(const EntityPack& entity_pack) const override {
+    [[nodiscard]] double constraint_satisfied(const EntityPack& entity_pack) const override {
         return m_constraint.is_satisfied(entity_pack);
     }
 

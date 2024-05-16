@@ -18,11 +18,9 @@ class Global {
         double reward = 0.0;
         for (const auto& poi : pack.entities) {
             // if (poi->observed()) continue;
-
-            if (poi->constraint_satisfied({poi, pack.agents, pack.entities})) {
-                // poi->set_observed(true);  // TDDO emit signal to POI instead.
-                reward += poi->value();
-            }
+            const auto& c = poi->constraint_satisfied({poi, pack.agents, pack.entities});
+            std::cout << "c: " << c << std::endl;
+            reward = reward + poi->value()*poi->constraint_satisfied({poi, pack.agents, pack.entities});
         }
         // reset pois
         // for (const auto& poi : pack.entities) poi->set_observed(false);

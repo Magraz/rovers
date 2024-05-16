@@ -12,7 +12,7 @@ namespace rovers {
  */
 class IConstraint {
    public:
-    [[nodiscard]] virtual bool is_satisfied(const EntityPack& entity_pack) const = 0;
+    [[nodiscard]] virtual double is_satisfied(const EntityPack& entity_pack) const = 0;
     virtual ~IConstraint() = default;
 };
 
