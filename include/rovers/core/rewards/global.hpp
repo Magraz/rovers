@@ -18,8 +18,6 @@ class Global {
         double reward = 0.0;
         for (const auto& poi : pack.entities) {
             // if (poi->observed()) continue;
-            const auto& c = poi->constraint_satisfied({poi, pack.agents, pack.entities});
-            std::cout << "c: " << c << std::endl;
             reward = reward + poi->value()*poi->constraint_satisfied({poi, pack.agents, pack.entities});
         }
         // reset pois
