@@ -23,7 +23,7 @@ class DepthCamera (rovers.ISensor):
 
     def scan(self, agent_pack):
         # I read 8x8 images!
-        image = np.zeros((8, 8), dtype=np.int)
+        image = np.zeros((8, 8), dtype=np.int32)
         # And apply lidar like composition to my image!
         composed_image = self.compositionPolicy.compose(
             image.flatten().tolist(), 1.0, 1.0)

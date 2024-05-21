@@ -35,13 +35,13 @@ class CountConstraint {
             std::sort(dists.begin(), dists.end());
 
             // Now make sure no values are less than 1.0
-            for (int i=0; i<dists.size(); ++i) {
+            for (int i=0; i<int(dists.size()); ++i) {
                 dists[i] = std::max(dists[i], 1.0);
             }
 
             // Now calculate how well this constraint was satisfied
             double constraint_value = count_constraint;
-            for (int i=0; i<count_constraint; ++i) {
+            for (int i=0; i<int(count_constraint); ++i) {
                 constraint_value = constraint_value * 1.0/dists[i];
             }
             return constraint_value;

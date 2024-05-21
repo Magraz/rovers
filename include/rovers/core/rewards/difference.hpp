@@ -17,7 +17,7 @@ class Difference {
         double reward = Global().compute(pack);
         // Make a vector of agents with the appropriate agent removed
         std::vector<Agent> agents_without_me;
-        for (int i = 0; i < pack.agents.size(); ++i) {
+        for (int i = 0; i < int(pack.agents.size()); ++i) {
             if (i != pack.agent_index) {
                 agents_without_me.push_back(pack.agents[i]);
             }

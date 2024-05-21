@@ -18,8 +18,6 @@ A PyTorch stub near the end of the file shows an example of running an episode.
 """
 
 
-
-
 """
 ================================================================================
 Custom Agents
@@ -65,9 +63,6 @@ class BonkedComposition(rovers.ISensorComposition):
         return max(range) + random.random() * self.bonk_factor
 
 
-
-
-
 """
 ================================================================================
 Custom Sensors
@@ -93,16 +88,12 @@ class DepthCamera (rovers.ISensor):
 
     def scan(self, agent_pack):
         # I read 8x8 images!
-        image = np.zeros((8, 8), dtype=np.int)
+        image = np.zeros((8, 8), dtype=np.int32)
         # And apply lidar like composition to my image!
         composed_image = self.compositionPolicy.compose(
             image.flatten().tolist(), 1.0, 1.0)
         # composed image with alpha=1.0
         return rovers.tensor([composed_image, 1.0])
-
-
-
-
 
 """
 ================================================================================
@@ -135,7 +126,6 @@ class StealthyPOI(rovers.IPOI):
         else:
             self.visible = True
 
-
 """
 Custom constraint:
 POIs with this constrait can only be observed \
@@ -148,11 +138,6 @@ class LastPOIConstraint(rovers.IConstraint):
                 return False
 
         return True
-
-
-
-
-
 
 """
 ================================================================================
@@ -167,11 +152,11 @@ class InDifference (rovers.rewards.IReward):
     def compute(self, agent_pack):
         global_reward = rovers.rewards.Global().compute(agent_pack)
 
-        without_me = list(filter(lambda r: std.addressof(r) != std.addressof(agent_pack.agent),
+        without_me = list(filter(lambda r: std.addressof(r) != std.addressof(agent_pack.agents[agent_pack.agent_index]),
                                  agent_pack.agents))  # filter myself out
         without_me.remove(random.choice(without_me))  # Ignore random rover :x
 
-        reward_without_me = rovers.rewards.Global().compute((agent_pack.agent, without_me, agent_pack.entities))
+        reward_without_me = rovers.rewards.Global().compute((agent_pack.agent_index, without_me, agent_pack.entities))
         return global_reward - reward_without_me
 
 # Rewards can be arbitrarily complex:
@@ -237,10 +222,6 @@ class FSMReward (rovers.rewards.IReward):
             if self.counted_ticks == 70:    # wait for 70 ticks, then transition
                 self.transition()
 
-
-
-
-
 """
 ================================================================================
 Setting up the environment
@@ -303,9 +284,6 @@ for state in states:
     print(state.transpose())
 
 
-
-
-
 """
 ================================================================================
 Setting up a policy: PyTorch stub
@@ -336,7 +314,6 @@ def get_values_from_pytorch(state):
 def learn(state, action, next_state, reward):
     # your machine/reinforcemnt learning \ evolution magic here
     pass
-
 
 
 """

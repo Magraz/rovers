@@ -79,7 +79,7 @@ class Lidar : public ISensor {
         }
 
         // observe rovers
-        for (int i = 0; i < pack.agents.size(); ++i) {
+        for (int i = 0; i < int(pack.agents.size()); ++i) {
             // Do not observe yourself
             if (i == pack.agent_index) continue;
 
