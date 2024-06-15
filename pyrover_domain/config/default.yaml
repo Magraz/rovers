@@ -1,0 +1,83 @@
+env:
+
+  agents:
+
+    rovers:
+      - observation_radius: 1000.0
+        reward_type: Global
+        resolution: 90
+        position:
+          spawn_rule: fixed
+          fixed: [25.0, 25.0]
+
+  pois:
+    rover_pois: []
+    hidden_pois:
+    - value: 1.0
+      observation_radius: 1000.0
+      coupling: 1
+      position:
+        spawn_rule: random_uniform
+        fixed: [5.0, 10.0]
+        random_uniform:
+          low_x: 0.0
+          high_x: 50.0
+          low_y: 0.0
+          high_y: 50.0
+        random_circle:
+          radius: 10.0
+          center: [25.0, 25.0]
+          
+  map_size: [50.0, 50.0]
+
+ccea:
+
+  weight_initialization:
+    lower_bound: -0.5
+    upper_bound: 0.5
+
+  network:
+    hidden_layers: [10]
+    rover_max_velocity: 1.0
+
+  population:
+    subpopulation_size: 50
+
+  evaluation:
+
+    evaluation_method: HallOfFame
+
+    multi_evaluation:
+      num_evaluations: 20
+      aggregation_method: average
+
+    hall_of_fame:
+      alpha: 0.5
+
+  selection:
+
+    selection_method: NElitesBinaryTournament,
+
+    n_elites_binary_tournament:
+      n_elites: 5
+      include_elites_in_tournament: True
+
+  mutation:
+    mean: 0.0
+    std_deviation: 0.1
+    independent_probability: 0.5
+
+  num_steps: 30
+  num_generations: 1
+
+processing:
+  use_multiprocessing: False
+  num_threads: 20
+
+experiment:
+  num_trials: 1
+  
+data:
+  save_trajectories:
+    switch: True
+    num_gens_between_save: 100

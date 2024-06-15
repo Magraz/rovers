@@ -1,0 +1,141 @@
+from pyrover_domain.librovers import rovers, thyme
+import numpy as np
+import cppyy
+import random
+from pyrover_domain.custom_pois import DecayPOI
+from pyrover_domain.custom_sensors import CustomLidar
+
+# First we're going to create a simple rover
+def createRover(obs_radius, reward_type, resolution):
+    Discrete = thyme.spaces.Discrete
+    if reward_type == "Global":
+        Reward = rovers.rewards.Global
+    elif reward_type == "Difference":
+        Reward = rovers.rewards.Difference
+    rover = rovers.Rover[CustomLidar, Discrete, Reward](obs_radius, CustomLidar(resolution=resolution, composition_policy=rovers.Density()), Reward())
+    rover.type = "rover"
+    return rover
+
+def createDecayPOI(value, obs_rad, coupling, decay_rate):
+    poi = DecayPOI(value, obs_rad, rovers.CountConstraint(coupling), decay_rate)
+    return poi
+
+def createPOI(value, obs_rad, coupling):
+    countConstraint = rovers.CountConstraint(coupling)
+    poi = rovers.POI[rovers.CountConstraint](value, obs_rad, countConstraint)
+    return poi
+
+def resolvePositionSpawnRule(position_dict):
+    if position_dict["spawn_rule"] == "fixed":
+        return position_dict["fixed"]
+    
+    elif position_dict["spawn_rule"] == "random_uniform":
+        low_x = position_dict["random_uniform"]["low_x"]
+        high_x = position_dict["random_uniform"]["high_x"]
+        x = random.uniform(low_x, high_x)
+        low_y = position_dict["random_uniform"]["low_y"]
+        high_y = position_dict["random_uniform"]["high_y"]
+        y = random.uniform(low_y, high_y)
+        return [x,y]
+    
+    elif position_dict["spawn_rule"] == "random_circle":
+        theta = random.uniform(0, 2*np.pi)
+        r = position_dict["random_circle"]["radius"]
+        center = position_dict["random_circle"]["center"]
+        x = r*np.cos(theta)+center[0]
+        y = r*np.sin(theta)+center[1]
+        return [x,y]
+
+# Let's have a function that builds out the environment
+def createEnv(config):
+    Env = rovers.Environment[rovers.CustomInit]
+
+    # Aggregate all of the positions of agents
+    agent_positions = []
+    for rover in config["env"]["agents"]["rovers"]:
+        position = resolvePositionSpawnRule(rover["position"])
+        agent_positions.append(position)
+
+    # Aggregate all of the positions of pois
+    poi_positions = []
+    for rover_poi in config["env"]["pois"]:
+        position = resolvePositionSpawnRule(rover_poi["position"])
+        poi_positions.append(position)
+
+    rovers_ = [
+        createRover(
+            obs_radius=rover["observation_radius"],
+            reward_type=rover["reward_type"],
+            resolution=rover["resolution"],
+        )
+        for rover in config["env"]["agents"]["rovers"]
+    ]
+
+    agents = rovers_
+
+    rover_pois = [
+        createPOI(
+            value=poi["value"],
+            obs_rad=poi["observation_radius"],
+            coupling=poi["coupling"],
+        )
+        for poi in config["env"]["pois"]
+    ]
+    
+    pois = rover_pois
+
+    env = Env(
+        rovers.CustomInit(agent_positions, poi_positions),
+        agents,
+        pois,
+        width=cppyy.gbl.ulong(config["env"]["map_size"][0]),
+        height=cppyy.gbl.ulong(config["env"]["map_size"][1])
+    )
+    return env
+
+# Alright let's give this a try
+def main():
+    config = {
+        "env": {
+            "agents": {
+                "rovers": [
+                    {
+                        "observation_radius": 3.0,
+                        "reward_type": "Global",
+                        "resolution": 90,
+                        "position": {"spawn_rule": "fixed", "fixed": [10.0, 10.0]}
+                    }
+                ],
+              
+            },
+            "pois": {
+                "rover_pois": [
+                    {
+                        "value": 1.0,
+                        "observation_radius": 1.0,
+                        "coupling": 1,
+                        "position": {"spawn_rule": "fixed", "fixed": [40.0, 40.0]}
+                    }
+                ],
+            
+            },
+            "map_size": [50.0, 50.0]
+        }
+    }
+
+    env = createEnv(config)
+
+    states, rewards = env.reset()
+
+    print("States:")
+    for ind, state in enumerate(states):
+        print("agent "+str(ind))
+        print(state.transpose())
+
+    print("Rewards:")
+    for ind, reward in enumerate(rewards):
+        print("reward "+str(ind))
+        print(reward)
+
+if __name__ == "__main__":
+    main()

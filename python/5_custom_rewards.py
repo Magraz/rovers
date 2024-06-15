@@ -10,11 +10,11 @@ class InDifference (rovers.rewards.IReward):
     def compute(self, agent_pack):
         global_reward = rovers.rewards.Global().compute(agent_pack)
 
-        without_me = list(filter(lambda r: std.addressof(r) != std.addressof(agent_pack.agent),
+        without_me = list(filter(lambda r: std.addressof(r) != std.addressof(agent_pack.agents[agent_pack.agent_index]),
                                  agent_pack.agents))  # filter myself out
         without_me.remove(random.choice(without_me))  # Ignore random rover :x
 
-        reward_without_me = rovers.rewards.Global().compute((agent_pack.agent, without_me, agent_pack.entities))
+        reward_without_me = rovers.rewards.Global().compute((agent_pack.agent_index, without_me, agent_pack.entities))
         return global_reward - reward_without_me
 
 # Rewards can be arbitrarily complex:

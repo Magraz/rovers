@@ -162,7 +162,7 @@ class CooperativeCoevolutionaryAlgorithm():
 
         # Load in the weights
         for rover_nn, individual in zip(rover_nns, team[:self.num_rovers]):
-            rover_nn.set_params(torch.tensor(individual))
+            rover_nn.set_params(torch.tensor(individual, dtype=torch.double))
         
         agent_nns = rover_nns
 
@@ -194,9 +194,10 @@ class CooperativeCoevolutionaryAlgorithm():
             actions = []
 
             for ind, (observation, agent_nn) in enumerate(zip(observations, agent_nns)):
+
                 obs_tensor = observation.data() 
                 obs_tensor.reshape((8,))
-                obs_tensor = np.frombuffer(obs_tensor, dtype=np.float32, count=8)
+                obs_tensor = np.frombuffer(obs_tensor, dtype=np.double, count=8)
                 obs_tensor = torch.from_numpy(obs_tensor)
 
                 action = agent_nn.forward(obs_tensor)
@@ -327,7 +328,7 @@ class CooperativeCoevolutionaryAlgorithm():
         eval_fitness_dir = trial_dir / "fitness.csv"
         header = "generation,team_fitness_aggregated"
         for j in range(self.num_rovers):
-            header += ",rover_"+str(j)+"_"
+            header += ",rover_"+str(j)
         
         for i in range(self.num_evaluations_per_team):
             header+=",team_fitness_"+str(i)
@@ -396,7 +397,7 @@ class CooperativeCoevolutionaryAlgorithm():
 
                 # Observations
                 for i in range(self.num_rovers):
-                    for j in range(self.num_rover_sectors):
+                    for j in range(self.num_rover_sectors * 2):
                         header += "rover_"+str(i)+"_obs_"+str(j)+","
                 
                 # Actions
@@ -406,9 +407,17 @@ class CooperativeCoevolutionaryAlgorithm():
                 header+="\n"
                 # Write out the header at the top of the csv
                 file.write(header)
+
                 # Now fill in the csv with the data
                 # One line at a time
                 joint_traj = eval_info.joint_trajectory
+                # print(f"STATES LEN{len(joint_traj.states[0])}")
+                # print(joint_traj.states[0])
+                # print(f"OBS LEN{len(joint_traj.observations[0])}")
+                # print(joint_traj.observations[0])
+                # print(f"ACTS LEN{len(joint_traj.actions[0])}")
+                # print(joint_traj.actions[0])
+
                 # We're going to pad the actions with None because
                 # the agents cannot take actions at the last timestep, but
                 # there is a final joint state/observations

@@ -315,7 +315,6 @@ def learn(state, action, next_state, reward):
     # your machine/reinforcemnt learning \ evolution magic here
     pass
 
-
 """
 ================================================================================
 Running n steps
@@ -328,11 +327,9 @@ states, _ = env.reset()
 steps = 1000
 for s in tqdm(range(steps)):
     
-    actions = []
-    for i in range(len(agents)):
-        action = rovers.tensor([policies[i].sample(get_values_from_pytorch(states[i])), 
-                               policies[i].sample(get_values_from_pytorch(states[i]))])
-        actions.append(action)
+    actions = [rovers.tensor([policies[i].sample(get_values_from_pytorch(states[i])), 
+                              policies[i].sample(get_values_from_pytorch(states[i]))]) 
+                              for i in range(len(agents))]
     '''
     actions = [
         policies[i].sample(get_values_from_pytorch(states[i])))
@@ -340,7 +337,7 @@ for s in tqdm(range(steps)):
     '''
     
     old_states = states
-    print ("actions: ", actions)
+    # print ("actions: ", actions)
     states, rewards = env.step(actions)
 
     for i in range(len(agents)):

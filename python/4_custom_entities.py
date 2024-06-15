@@ -28,7 +28,6 @@ class StealthyPOI(rovers.IPOI):
         else:
             self.visible = True
 
-
 """
 Custom constraint:
 POIs with this constrait can only be observed \
