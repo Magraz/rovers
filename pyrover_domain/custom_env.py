@@ -16,8 +16,8 @@ def createRover(obs_radius, reward_type, resolution):
     rover.type = "rover"
     return rover
 
-def createDecayPOI(value, obs_rad, coupling, decay_rate):
-    poi = DecayPOI(value, obs_rad, rovers.CountConstraint(coupling), decay_rate)
+def createDecayPOI(value, obs_rad, coupling, lifespan):
+    poi = DecayPOI(value, obs_rad, rovers.CountConstraint(coupling), lifespan)
     return poi
 
 def createPOI(value, obs_rad, coupling):
@@ -79,6 +79,12 @@ def createEnv(config):
             obs_rad=poi["observation_radius"],
             coupling=poi["coupling"],
         )
+        # createDecayPOI(
+        #     value=poi["value"],
+        #     obs_rad=poi["observation_radius"],
+        #     coupling=poi["coupling"],
+        #     lifespan=poi["lifespan"]*config['ccea']['num_steps']
+        # )
         for poi in config["env"]["pois"]
     ]
     

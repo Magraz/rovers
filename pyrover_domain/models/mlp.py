@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from copy import deepcopy
 
 class MLP_Policy(nn.Module):  # inheriting from nn.Module!
 
@@ -12,7 +13,7 @@ class MLP_Policy(nn.Module):  # inheriting from nn.Module!
         self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
 
     def forward(self, x: torch.Tensor):
-        out = F.relu(self.fc1(x))
+        out = F.leaky_relu(self.fc1(x))
         out = self.output(out)
         return F.tanh(out)
     
@@ -23,17 +24,20 @@ class MLP_Policy(nn.Module):  # inheriting from nn.Module!
         nn.utils.vector_to_parameters(params, self.parameters())
     
 if __name__ == "__main__":
-    model = MLP_Policy(input_size=8, hidden_size=32, output_size=2)
-    print(model.num_params)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    input = torch.tensor([-1,-1,-1,-1,-1,-1,-1,-1], dtype=torch.double)
-    print(model.forward(input))
+    model = MLP_Policy(input_size=8, hidden_size=32, output_size=2).to(device)
+    model_copy = deepcopy(model)
+    print(model_copy.num_params)
 
-    rand_params = torch.rand(model.get_params().size())
-    mutated_params = torch.add(model.get_params(), rand_params)
+    input = torch.tensor([-1,-1,-1,-1,-1,-1,-1,-1], dtype=torch.double).to(device)
+    print(model_copy.forward(input))
 
-    model.set_params(mutated_params)
+    rand_params = torch.rand(model_copy.get_params().size()).to(device)
+    mutated_params = torch.add(model_copy.get_params(), rand_params).to(device)
 
-    print(model.forward(input))
+    model_copy.set_params(mutated_params)
+
+    print(model_copy.forward(input))
 
 

@@ -7,7 +7,7 @@ T:
     Total time before complete decay, playing with this value speeds up or slows down decay. Usually multiples of T.
 """
 class DecayPOI(rovers.IPOI):
-    def __init__(self, value: float, obs_radius: float, constraintPolicy: rovers.IConstraint, T: int):
+    def __init__(self, value: float, obs_radius: float, constraintPolicy: rovers.IConstraint, lifespan: int):
         super().__init__(value, obs_radius)
 
         # we will use the stealth combined with a constraint defined in the lib
@@ -16,7 +16,7 @@ class DecayPOI(rovers.IPOI):
         self.constraintPolicy = constraintPolicy
         self.visible = True
         self.init_value = value
-        self.decay_rate = -np.log(self.final_val)/T
+        self.decay_rate = -np.log(self.final_val)/lifespan
         self.tolerance = self.final_val * value
 
     # Use a library defined or custom constraint policy with stealth

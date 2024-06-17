@@ -23,21 +23,15 @@ env:
         position:
           spawn_rule: fixed
           fixed: [25.0, 25.0]
-      
-      - observation_radius: 1000.0
-        reward_type: Difference
-        resolution: 90
-        position:
-          spawn_rule: fixed
-          fixed: [25.0, 25.0]
 
   pois:
     - value: 1.0
       observation_radius: 10.0
-      coupling: 2
+      coupling: 1
+      lifespan: 0.3
       position:
         spawn_rule: fixed
-        fixed: [10.0, 40.0]
+        fixed: [10.0, 10.0]
         random_uniform:
           low_x: 0.0
           high_x: 50.0
@@ -49,7 +43,8 @@ env:
     
     - value: 1.0
       observation_radius: 10.0
-      coupling: 2
+      coupling: 1
+      lifespan: 0.6
       position:
         spawn_rule: fixed
         fixed: [40.0, 10.0]
@@ -61,10 +56,11 @@ env:
     
     - value: 1.0
       observation_radius: 10.0
-      coupling: 2
+      coupling: 1
+      lifespan: 0.9
       position:
         spawn_rule: fixed
-        fixed: [10.0, 10.0]
+        fixed: [40.0, 40.0]
         random_uniform:
           low_x: 0.0
           high_x: 50.0
@@ -115,7 +111,7 @@ ccea:
 
 processing:
   use_multiprocessing: True
-  num_threads: 20
+  num_threads: 15
 
 experiment:
   num_trials: 1

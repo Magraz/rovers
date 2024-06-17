@@ -4,7 +4,7 @@ from deap import tools
 from tqdm import tqdm
 import torch
 
-import multiprocessing
+import torch.multiprocessing as mp
 import random
 
 from pyrover_domain.models.mlp import MLP_Policy
@@ -13,9 +13,11 @@ from pyrover_domain.librovers import rovers
 from pyrover_domain.custom_env import createEnv
 from copy import deepcopy
 import numpy as np
-import os
+import os 
 from pathlib import Path
 import yaml
+
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class JointTrajectory():
     def __init__(self, joint_state_trajectory, joint_observation_trajectory, joint_action_trajectory):
@@ -70,7 +72,7 @@ class CooperativeCoevolutionaryAlgorithm():
         # Now set up the toolbox
         self.toolbox = base.Toolbox()
         if self.use_multiprocessing:
-            self.pool = multiprocessing.Pool(processes=self.num_threads)
+            self.pool = mp.Pool(processes=self.num_threads)
             self.map = self.pool.map_async
         else:
             self.toolbox.register("map", map)
@@ -90,7 +92,7 @@ class CooperativeCoevolutionaryAlgorithm():
 
 
     def generateTemplateNN(self, num_sectors):
-        agent_nn = MLP_Policy(input_size=2*num_sectors, hidden_size=self.num_hidden[0], output_size=2)
+        agent_nn = MLP_Policy(input_size=2*num_sectors, hidden_size=self.num_hidden[0], output_size=2).to(DEVICE)
         return agent_nn
 
     def generateWeight(self):
@@ -162,7 +164,7 @@ class CooperativeCoevolutionaryAlgorithm():
 
         # Load in the weights
         for rover_nn, individual in zip(rover_nns, team[:self.num_rovers]):
-            rover_nn.set_params(torch.tensor(individual, dtype=torch.double))
+            rover_nn.set_params(torch.tensor(individual, dtype=torch.double).to(DEVICE))
         
         agent_nns = rover_nns
 
@@ -198,11 +200,11 @@ class CooperativeCoevolutionaryAlgorithm():
                 obs_tensor = observation.data() 
                 obs_tensor.reshape((8,))
                 obs_tensor = np.frombuffer(obs_tensor, dtype=np.double, count=8)
-                obs_tensor = torch.from_numpy(obs_tensor)
+                obs_tensor = torch.from_numpy(obs_tensor).to(DEVICE)
 
                 action = agent_nn.forward(obs_tensor)
 
-                action_arr = action.detach().numpy()
+                action_arr = action.cpu().detach().numpy()
 
                 # Multiply by agent velocity
                 if ind <= self.num_rovers:
@@ -271,6 +273,7 @@ class CooperativeCoevolutionaryAlgorithm():
             remaining_offspring = tools.selWorst(subpopulation, len(subpopulation)-self.n_elites)
             # Add those remaining individuals through a binary tournament
             offspring += tools.selTournament(remaining_offspring, len(remaining_offspring), tournsize=2)
+
         # Return a deepcopy so that modifying an individual that was selected does not modify every single individual
         # that came from the same selected individual
         return [ deepcopy(individual) for individual in offspring ]
@@ -342,24 +345,29 @@ class CooperativeCoevolutionaryAlgorithm():
     def writeEvalFitnessCSV(self, trial_dir, eval_infos):
         eval_fitness_dir = trial_dir / "fitness.csv"
         gen = str(self.gen)
+
         if len(eval_infos) == 1:
             eval_info = eval_infos[0]
             team_fit = str(eval_info.fitnesses[-1][0])
             agent_fits = [str(fit[0]) for fit in eval_info.fitnesses[:-1]]
             fit_list = [gen, team_fit]+agent_fits
             fit_str = ','.join(fit_list)+'\n'
+
         else:
             team_eval_infos = []
             for eval_info in eval_infos:
                 team_eval_infos.append(eval_info)
+
             # Aggergate the fitnesses into a big numpy array
             num_ind_per_team = len(team_eval_infos[0].fitnesses)
             all_fit = np.zeros(shape=(self.num_evaluations_per_team, num_ind_per_team))
+
             for num_eval, eval_info in enumerate(team_eval_infos):
                 fitnesses = eval_info.fitnesses
                 for num_ind, fit in enumerate(fitnesses):
                     all_fit[num_eval, num_ind] = fit[0]
                 all_fit[num_eval, -1] = fitnesses[-1][0]
+                
             # Now compute a sum/average/min/etc dependending on what config specifies
             agg_fit = np.average(all_fit, axis=0)
             # And now record it all, starting with the aggregated one
@@ -380,8 +388,10 @@ class CooperativeCoevolutionaryAlgorithm():
     def writeEvalTrajs(self, trial_dir, eval_infos):
         gen_folder_name = "gen_"+str(self.gen)
         gen_dir = trial_dir / gen_folder_name
+
         if not os.path.isdir(gen_dir):
             os.makedirs(gen_dir)
+
         for eval_id, eval_info in enumerate(eval_infos):
             eval_filename = "eval_team_"+str(eval_id)+"_joint_traj.csv"
             eval_dir = gen_dir / eval_filename
@@ -411,6 +421,7 @@ class CooperativeCoevolutionaryAlgorithm():
                 # Now fill in the csv with the data
                 # One line at a time
                 joint_traj = eval_info.joint_trajectory
+
                 # print(f"STATES LEN{len(joint_traj.states[0])}")
                 # print(joint_traj.states[0])
                 # print(f"OBS LEN{len(joint_traj.observations[0])}")
