@@ -1,0 +1,103 @@
+env:
+
+  agents:
+
+    rovers:
+      - observation_radius: 1000.0
+        reward_type: Difference
+        resolution: 90
+        position:
+          spawn_rule: fixed
+          fixed: [25.0, 25.0]
+      
+      - observation_radius: 1000.0
+        reward_type: Difference
+        resolution: 90
+        position:
+          spawn_rule: fixed
+          fixed: [25.0, 25.0]
+
+  pois:
+    - type: decay
+      value: 40.0
+      observation_radius: 2.5
+      coupling: 2
+      lifespan: 0.25
+      position:
+        spawn_rule: fixed
+        fixed: [15.0, 15.0]
+    
+    - type: decay
+      value: 20.0
+      observation_radius: 2.5
+      coupling: 2
+      lifespan: 0.5
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 10.0]
+
+    - type: decay
+      value: 10.0
+      observation_radius: 2.5
+      coupling: 2
+      lifespan: 0.75
+      position:
+        spawn_rule: fixed
+        fixed: [35.0, 15.0]
+          
+  map_size: [50.0, 50.0]
+
+ccea:
+
+  weight_initialization:
+    lower_bound: -0.5
+    upper_bound: 0.5
+
+  model:
+    type: GRU #GRU/MLP
+    hidden_layers: [16]
+    rover_max_velocity: 1.0
+
+  population:
+    subpopulation_size: 50
+
+  evaluation:
+
+    evaluation_method: HallOfFame
+
+    multi_evaluation:
+      num_evaluations: 10
+      aggregation_method: average
+
+    hall_of_fame:
+      alpha: 0.5
+    
+    fitness_method: aggregate #aggregate/last_step
+
+  selection:
+
+    selection_method: NElitesBinaryTournament,
+
+    n_elites_binary_tournament:
+      n_elites: 5
+      include_elites_in_tournament: True
+
+  mutation:
+    mean: 0.0
+    std_deviation: 0.2
+    independent_probability: 0.5
+
+  num_steps: 200
+  num_generations: 1000
+
+processing:
+  use_multiprocessing: True
+  num_threads: 10
+
+experiment:
+  num_trials: 1
+  
+data:
+  save_trajectories:
+    switch: True
+    num_gens_between_save: 10

@@ -73,20 +73,24 @@ def createEnv(config):
 
     agents = rovers_
 
-    rover_pois = [
-        createPOI(
-            value=poi["value"],
-            obs_rad=poi["observation_radius"],
-            coupling=poi["coupling"],
-        )
-        # createDecayPOI(
-        #     value=poi["value"],
-        #     obs_rad=poi["observation_radius"],
-        #     coupling=poi["coupling"],
-        #     lifespan=poi["lifespan"]*config['ccea']['num_steps']
-        # )
-        for poi in config["env"]["pois"]
-    ]
+    rover_pois = []
+    for poi in config["env"]["pois"]:
+
+        match(poi['type']):
+            case 'static':
+                rover_pois.append(createPOI(
+                    value=poi["value"],
+                    obs_rad=poi["observation_radius"],
+                    coupling=poi["coupling"],
+                ))
+
+            case 'decay':
+                rover_pois.append(createDecayPOI(
+                    value=poi["value"],
+                    obs_rad=poi["observation_radius"],
+                    coupling=poi["coupling"],
+                    lifespan=poi["lifespan"]*config['ccea']['num_steps']
+                ))
     
     pois = rover_pois
 

@@ -1,9 +1,6 @@
 cppyy==2.2.0
-future
-numpy
-pillow
-pyglet
-tqdm
 torch
+numpy
+tqdm
 deap
 pyyaml

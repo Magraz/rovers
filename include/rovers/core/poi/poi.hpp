@@ -25,6 +25,7 @@ class IPOI {
     }
 
     const double& value() const { return m_value; }
+    void set_value(double val) { m_value = val; }
     const double& obs_radius() const { return m_obs_radius; }
 
     void set_observed(bool observed) { m_observed = observed; }

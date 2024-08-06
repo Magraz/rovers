@@ -9,13 +9,6 @@ env:
         position:
           spawn_rule: fixed
           fixed: [25.0, 25.0]
-
-      - observation_radius: 1000.0
-        reward_type: Difference
-        resolution: 90
-        position:
-          spawn_rule: fixed
-          fixed: [25.0, 25.0]
       
       - observation_radius: 1000.0
         reward_type: Difference
@@ -25,47 +18,32 @@ env:
           fixed: [25.0, 25.0]
 
   pois:
-    - value: 1.0
-      observation_radius: 10.0
-      coupling: 1
-      lifespan: 0.3
+    - type: decay
+      value: 40.0
+      observation_radius: 2.5
+      coupling: 2
+      lifespan: 0.25
       position:
         spawn_rule: fixed
-        fixed: [10.0, 10.0]
-        random_uniform:
-          low_x: 0.0
-          high_x: 50.0
-          low_y: 0.0
-          high_y: 50.0
-        random_circle:
-          radius: 10.0
-          center: [25.0, 25.0]
+        fixed: [15.0, 15.0]
     
-    - value: 1.0
-      observation_radius: 10.0
-      coupling: 1
-      lifespan: 0.6
+    - type: decay
+      value: 20.0
+      observation_radius: 2.5
+      coupling: 2
+      lifespan: 0.5
       position:
         spawn_rule: fixed
-        fixed: [40.0, 10.0]
-        random_uniform:
-          low_x: 0.0
-          high_x: 50.0
-          low_y: 0.0
-          high_y: 50.0
-    
-    - value: 1.0
-      observation_radius: 10.0
-      coupling: 1
-      lifespan: 0.9
+        fixed: [25.0, 10.0]
+
+    - type: decay
+      value: 10.0
+      observation_radius: 2.5
+      coupling: 2
+      lifespan: 0.75
       position:
         spawn_rule: fixed
-        fixed: [40.0, 40.0]
-        random_uniform:
-          low_x: 0.0
-          high_x: 50.0
-          low_y: 0.0
-          high_y: 50.0
+        fixed: [35.0, 15.0]
           
   map_size: [50.0, 50.0]
 
@@ -75,8 +53,9 @@ ccea:
     lower_bound: -0.5
     upper_bound: 0.5
 
-  network:
-    hidden_layers: [10]
+  model:
+    type: MLP #GRU/MLP
+    hidden_layers: [32]
     rover_max_velocity: 1.0
 
   population:
@@ -87,11 +66,13 @@ ccea:
     evaluation_method: HallOfFame
 
     multi_evaluation:
-      num_evaluations: 20
+      num_evaluations: 10
       aggregation_method: average
 
     hall_of_fame:
       alpha: 0.5
+    
+    fitness_method: aggregate #aggregate/last_step
 
   selection:
 
@@ -103,15 +84,15 @@ ccea:
 
   mutation:
     mean: 0.0
-    std_deviation: 0.1
+    std_deviation: 0.2
     independent_probability: 0.5
 
-  num_steps: 30
-  num_generations: 100
+  num_steps: 200
+  num_generations: 1000
 
 processing:
   use_multiprocessing: True
-  num_threads: 15
+  num_threads: 10
 
 experiment:
   num_trials: 1

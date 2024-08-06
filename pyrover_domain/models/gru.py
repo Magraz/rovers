@@ -3,18 +3,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
 
-class MLP_Policy(nn.Module):  # inheriting from nn.Module!
+class GRU_Policy(nn.Module):  # inheriting from nn.Module!
 
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
-        super(MLP_Policy, self).__init__()
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int,):
+        super(GRU_Policy, self).__init__()
         
-        self.fc1 = nn.Linear(input_size, hidden_size, dtype=torch.double)
+        self.rnn = nn.GRU(input_size, hidden_size, num_layers, dtype=torch.double)
         self.output = nn.Linear(hidden_size, output_size, dtype=torch.double)
         self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
 
     def forward(self, x: torch.Tensor):
-        out = F.sigmoid(self.fc1(x))
-        out = self.output(out)
+        self.rnn.flatten_parameters()
+        _, hn = self.rnn(x)
+        out = self.output(hn)
         return F.tanh(out)
     
     def get_params(self):
@@ -26,11 +27,11 @@ class MLP_Policy(nn.Module):  # inheriting from nn.Module!
 if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = MLP_Policy(input_size=8, hidden_size=32, output_size=2).to(device)
+    model = GRU_Policy(input_size=8, hidden_size=16, output_size=2, num_layers=1).to(device)
     model_copy = deepcopy(model)
     print(model_copy.num_params)
 
-    input = torch.tensor([-1,-1,-1,-1,-1,-1,-1,-1], dtype=torch.double).to(device)
+    input = torch.tensor([[-1,-1,-1,-1,-1,-1,-1,-1]], dtype=torch.double).to(device)
     print(model_copy.forward(input))
 
     rand_params = torch.rand(model_copy.get_params().size()).to(device)
