@@ -93,9 +93,12 @@ processing:
   num_threads: 10
 
 experiment:
+  trial_name: multi_gru_decay
   num_trials: 1
   
 data:
-  save_trajectories:
-    switch: True
-    num_gens_between_save: 20
+  load_checkpoint: True
+  load_checkpoint_filename: checkpoint.pickle
+  save_trajectories: True
+  save_checkpoint: True
+  num_gens_between_save: 20
