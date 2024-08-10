@@ -1,35 +1,33 @@
 env:
 
-  agents:
+  rovers:
+    - observation_radius: 1000.0
+      reward_type: Difference
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
 
-    rovers:
-      - observation_radius: 1000.0
-        reward_type: Difference
-        resolution: 90
-        position:
-          spawn_rule: fixed
-          fixed: [25.0, 25.0]
-
-      - observation_radius: 1000.0
-        reward_type: Difference
-        resolution: 90
-        position:
-          spawn_rule: fixed
-          fixed: [25.0, 25.0]
-      
-      - observation_radius: 1000.0
-        reward_type: Difference
-        resolution: 90
-        position:
-          spawn_rule: fixed
-          fixed: [25.0, 25.0]
-      
-      - observation_radius: 1000.0
-        reward_type: Difference
-        resolution: 90
-        position:
-          spawn_rule: fixed
-          fixed: [25.0, 25.0]
+    - observation_radius: 1000.0
+      reward_type: Difference
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: Difference
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: Difference
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
 
   pois:
     - type: static
@@ -111,4 +109,4 @@ experiment:
 data:
   save_trajectories:
     switch: True
-    num_gens_between_save: 10
+    num_gens_between_save: 20
