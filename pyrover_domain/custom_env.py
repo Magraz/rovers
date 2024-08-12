@@ -3,19 +3,27 @@ import numpy as np
 import cppyy
 import random
 from pyrover_domain.custom_pois import DecayPOI
-from pyrover_domain.custom_sensors import CustomLidar
+from pyrover_domain.custom_sensors import CustomLidar, CustomCamera
 
 
 # First we're going to create a simple rover
-def createRover(obs_radius, reward_type, resolution):
-    Discrete = thyme.spaces.Discrete
-    if reward_type == "Global":
-        Reward = rovers.rewards.Global
-    elif reward_type == "Difference":
-        Reward = rovers.rewards.Difference
-    rover = rovers.Rover[CustomLidar, Discrete, Reward](
-        obs_radius, CustomLidar(resolution=resolution, composition_policy=rovers.Density()), Reward()
-    )
+def createRover(obs_radius: float, img_size: float, reward_type: str, sensor_type: str, resolution: float):
+    discrete = thyme.spaces.Discrete
+
+    match (reward_type):
+        case "global":
+            reward = rovers.rewards.Global
+        case "difference":
+            reward = rovers.rewards.Difference
+
+    match (sensor_type):
+        case "lidar":
+            sensor = CustomLidar(resolution=resolution, composition_policy=rovers.Density())
+            rover = rovers.Rover[CustomLidar, discrete, reward](obs_radius, sensor, reward())
+        case "camera":
+            sensor = CustomCamera(img_size=img_size)
+            rover = rovers.Rover[CustomCamera, discrete, reward](obs_radius, sensor, reward())
+
     rover.type = "rover"
     return rover
 
@@ -32,29 +40,31 @@ def createPOI(value, obs_rad, coupling):
 
 
 def resolvePositionSpawnRule(position_dict):
-    if position_dict["spawn_rule"] == "fixed":
-        return position_dict["fixed"]
 
-    elif position_dict["spawn_rule"] == "random_uniform":
-        low_x = position_dict["random_uniform"]["low_x"]
-        high_x = position_dict["random_uniform"]["high_x"]
-        x = random.uniform(low_x, high_x)
-        low_y = position_dict["random_uniform"]["low_y"]
-        high_y = position_dict["random_uniform"]["high_y"]
-        y = random.uniform(low_y, high_y)
-        return [x, y]
+    match (position_dict["spawn_rule"]):
+        case "fixed":
+            return position_dict["fixed"]
 
-    elif position_dict["spawn_rule"] == "random_circle":
-        theta = random.uniform(0, 2 * np.pi)
-        r = position_dict["random_circle"]["radius"]
-        center = position_dict["random_circle"]["center"]
-        x = r * np.cos(theta) + center[0]
-        y = r * np.sin(theta) + center[1]
-        return [x, y]
+        case "random_uniform":
+            low_x = position_dict["random_uniform"]["low_x"]
+            high_x = position_dict["random_uniform"]["high_x"]
+            x = random.uniform(low_x, high_x)
+            low_y = position_dict["random_uniform"]["low_y"]
+            high_y = position_dict["random_uniform"]["high_y"]
+            y = random.uniform(low_y, high_y)
+            return [x, y]
+
+        case "random_circle":
+            theta = random.uniform(0, 2 * np.pi)
+            r = position_dict["random_circle"]["radius"]
+            center = position_dict["random_circle"]["center"]
+            x = r * np.cos(theta) + center[0]
+            y = r * np.sin(theta) + center[1]
+            return [x, y]
 
 
 # Let's have a function that builds out the environment
-def createEnv(config):
+def createEnv(config, current_gen: int):
     Env = rovers.Environment[rovers.CustomInit]
 
     # Aggregate all of the positions of agents
@@ -65,14 +75,28 @@ def createEnv(config):
 
     # Aggregate all of the positions of pois
     poi_positions = []
-    for rover_poi in config["env"]["pois"]:
-        position = resolvePositionSpawnRule(rover_poi["position"])
+    for poi in config["env"]["pois"]:
+        position = resolvePositionSpawnRule(poi["position"])
         poi_positions.append(position)
+
+    # Alter order of POI positions
+    if config["env"]["pois"]["alter_order"]["alter"]:
+
+        match (config["env"]["pois"]["alter_order"]["type"]):
+
+            case "reverse":
+                if np.choice(
+                    [True, False],
+                    p=[config["env"]["pois"]["alter_order"]["type"], 1 - config["env"]["pois"]["alter_order"]["type"]],
+                ):
+                    poi_positions = reversed(poi_positions)
 
     rovers_ = [
         createRover(
             obs_radius=rover["observation_radius"],
+            img_size=int(np.ceil(config["env"]["map_size"][0] / 2)),  # Watch a quarter of the map
             reward_type=rover["reward_type"],
+            sensor_type=rover["sensor_type"],
             resolution=rover["resolution"],
         )
         for rover in config["env"]["rovers"]
