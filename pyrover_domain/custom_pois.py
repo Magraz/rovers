@@ -16,6 +16,7 @@ class DecayPOI(rovers.IPOI):
         constraintPolicy: rovers.IConstraint,
         lifespan: int,
         decay_start: float = 0,
+        decay_value: bool = True,
     ):
         super().__init__(value, obs_radius)
 
@@ -28,6 +29,7 @@ class DecayPOI(rovers.IPOI):
         self.decay_rate = -np.log(self.final_val) / lifespan
         self.tolerance = self.final_val * value
         self.decay_start = decay_start
+        self.decay_value = decay_value
 
     # Use a library defined or custom constraint policy with stealth
     def constraint_satisfied(self, entity_pack):
@@ -44,9 +46,14 @@ class DecayPOI(rovers.IPOI):
         if not self.visible:
             return
 
+        decayed_value = self.init_value * np.power((1 - self.decay_rate), self.time_step - self.decay_start)
+
+        if self.decay_value:
+            self.set_value(decayed_value)
+
         if self.decay_start <= self.time_step:
             if np.isclose(
-                self.init_value * np.power((1 - self.decay_rate), self.time_step - self.decay_start),
+                decayed_value,
                 0,
                 rtol=self.tolerance,
                 atol=self.tolerance,
