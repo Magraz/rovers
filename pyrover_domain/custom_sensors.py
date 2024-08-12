@@ -1,14 +1,16 @@
 from pyrover_domain.librovers import rovers  # import bindings.
 import numpy as np
-import logging 
+import logging
 import cppyy
- 
+
 # Creating an object
 logger = logging.getLogger()
 
 """
 A custom Lidar
 """
+
+
 class CustomLidar(rovers.Lidar[rovers.Density]):
     def __init__(self, resolution, composition_policy):
 
@@ -16,9 +18,9 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
 
         self.m_resolution = resolution
         self.m_composition = composition_policy
-    
+
     def calculateDistance(self, position_0, position_1):
-        return np.linalg.norm([position_0.x-position_1.x, position_0.y-position_1.y])
+        return np.linalg.norm([position_0.x - position_1.x, position_0.y - position_1.y])
 
     def calculateAngle(self, position_0, position_1):
         pos0 = np.array([position_0.x, position_0.y])
@@ -26,16 +28,16 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
 
         # Create a vector from position 0 to 1
         vec = pos1 - pos0
-        
+
         # Take the arctan2 of the y, x of that vector
-        angle = np.arctan2(vec[1], vec[0]) * 180./np.pi
+        angle = np.arctan2(vec[1], vec[0]) * 180.0 / np.pi
         if angle < 0:
-            angle += 360.
-            
+            angle += 360.0
+
         return angle
 
     def scan(self, agent_pack):
-        num_sectors = int(360. / self.m_resolution)
+        num_sectors = int(360.0 / self.m_resolution)
         poi_values = [[] for _ in range(num_sectors)]
         rover_values = [[] for _ in range(num_sectors)]
         agent = agent_pack.agents[agent_pack.agent_index]
@@ -46,7 +48,7 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
             # Get angle and distance to POI
             angle = self.calculateAngle(agent.position(), sensed_poi.position())
             distance = self.calculateDistance(agent.position(), sensed_poi.position())
-            
+
             logger.debug(f"angle: {angle}")
             logger.debug(f"distance: {distance}")
 
@@ -54,10 +56,10 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
             if distance > agent.obs_radius():
                 logger.debug("continue, out of range")
                 continue
-            
+
             # Bin the POI according to where it was sensed
             if angle < 360.0:
-                sector = int( angle / self.m_resolution )
+                sector = int(angle / self.m_resolution)
             else:
                 sector = 0
 
@@ -91,7 +93,7 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
 
             # Get the bin for this agent
             if angle < 360.0:
-                sector = int( angle / self.m_resolution )
+                sector = int(angle / self.m_resolution)
             else:
                 sector = 0
 
@@ -104,7 +106,7 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
         logger.debug("Encoding state")
 
         # num_sectors*2 since we have 4 sectors and 2 types of distances, rovers and pois, these are accumulated into a single value by the lidar.hpp Density class
-        state = np.array([-1.0 for _ in range(num_sectors*2)])
+        state = np.array([-1.0 for _ in range(num_sectors * 2)])
 
         logger.debug(f"state: {state}")
 
@@ -117,7 +119,9 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
             if num_rovers > 0:
 
                 logger.debug("num_rovers > 0")
-                logger.debug(f"rover_values[{str(i)}]: {rover_values[i]} {type(rover_values[i])} {type(rover_values[i][0])}")
+                logger.debug(
+                    f"rover_values[{str(i)}]: {rover_values[i]} {type(rover_values[i])} {type(rover_values[i][0])}"
+                )
                 logger.debug(f"num_rovers: {type(num_rovers)}")
 
                 cpp_vector = cppyy.gbl.std.vector[cppyy.gbl.double]()
@@ -126,7 +130,7 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
                     cpp_vector.push_back(r)
 
                 state[i] = self.m_composition.compose(cpp_vector, 0.0, num_rovers)
-            
+
             if num_pois > 0:
                 logger.debug("num_pois > 0")
                 logger.debug(f"poi_values[{str(i)}]: {poi_values[i]} {type(poi_values[i])} {type(poi_values[i][0])}")
@@ -142,3 +146,61 @@ class CustomLidar(rovers.Lidar[rovers.Density]):
                 state[num_sectors + i] = self.m_composition.compose(cpp_vector, 0.0, num_pois)
 
         return rovers.tensor(state)
+
+
+"""
+CustomCameras: Camera sensor
+"""
+
+
+class CustomCamera(rovers.ISensor):
+    def __init__(self, img_size: int):
+        super().__init__()
+
+        self.img_size = img_size
+        self.img_center = (int(np.ceil(self.img_size / 2)) - 1, int(np.ceil(self.img_size / 2)) - 1)  # (x,y)
+
+    def update_positions_in_image(self, image: np.ndarray, src_pos, target_pos, update_val: int):
+        x_diff = int(target_pos.x - src_pos.x)
+        y_diff = int(target_pos.x - src_pos.x)
+
+        # If in range, set value of POI in sensor
+        if (np.abs(x_diff) <= self.img_center[0]) and (np.abs(y_diff) <= self.img_center[1]):
+
+            x_coord = self.img_center[0] + x_diff
+            y_coord = self.img_center[1] + y_diff
+
+            # If more than one agent/POI are in the same place, add 1 to the current position instead of setting to just 1.
+            if image[x_coord, y_coord] > 0:
+                image[x_coord, y_coord] += update_val
+            else:
+                image[x_coord, y_coord] = update_val
+
+    def scan(self, agent_pack):
+
+        agent = agent_pack.agents[agent_pack.agent_index]
+
+        # Observe POIs
+        sensed_poi_image = np.zeros((self.img_size, self.img_size), dtype=np.float64)
+
+        for sensed_poi in agent_pack.entities:
+
+            self.update_positions_in_image(
+                sensed_poi_image, agent.position(), sensed_poi.position(), sensed_poi.value()
+            )
+
+        # Observe agents
+        sensed_agents_image = np.zeros((self.img_size, self.img_size), dtype=np.float64)
+        for i in range(agent_pack.agents.size()):
+
+            # Do not observe yourself
+            if i == agent_pack.agent_index:
+                continue
+
+            # Get another sensed agent
+            sensed_agent = agent_pack.agents[int(i)]
+            self.update_positions_in_image(sensed_agents_image, agent.position(), sensed_agent.position(), 1)
+
+        output_image = np.concatenate([sensed_poi_image.flatten(), sensed_agents_image.flatten()], axis=0)
+
+        return rovers.tensor(output_image)
