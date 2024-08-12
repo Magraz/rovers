@@ -9,6 +9,7 @@ import random
 
 from pyrover_domain.models.mlp import MLP_Policy
 from pyrover_domain.models.gru import GRU_Policy
+from pyrover_domain.models.cnn import CNN_Policy
 
 from pyrover_domain.librovers import rovers
 from pyrover_domain.custom_env import createEnv
@@ -18,6 +19,7 @@ import os
 from pathlib import Path
 import yaml
 import logging
+import pickle
 
 # Create and configure logger
 logging.basicConfig(format="%(asctime)s %(message)s")
@@ -44,8 +46,9 @@ class JointTrajectory:
 
 
 class EvalInfo:
-    def __init__(self, fitnesses, joint_trajectory):
-        self.fitnesses = fitnesses
+    def __init__(self, agent_fitnesses, team_fitness, joint_trajectory):
+        self.agent_fitnesses = agent_fitnesses
+        self.team_fitness = team_fitness
         self.joint_trajectory = joint_trajectory
 
 
@@ -57,11 +60,17 @@ class CooperativeCoevolutionaryAlgorithm:
         with open(str(self.config_dir), "r") as file:
             self.config = yaml.safe_load(file)
 
+        # Experiemtn data
+        self.trial_name = self.config["experiment"]["trial_name"]
+
         # Start by setting up variables for different agents
-        self.num_rovers = len(self.config["env"]["agents"]["rovers"])
+        self.num_rovers = len(self.config["env"]["rovers"])
         self.subpopulation_size = self.config["ccea"]["population"]["subpopulation_size"]
         self.num_hidden = self.config["ccea"]["model"]["hidden_layers"]
         self.model_type = self.config["ccea"]["model"]["type"]
+
+        self.sensor_type = self.config["env"]["rovers"][0]["sensor_type"]
+        self.image_size = int(np.ceil(self.config["env"]["map_size"][0] / 2))
 
         self.num_pois = len(self.config["env"]["pois"])
 
@@ -77,16 +86,21 @@ class CooperativeCoevolutionaryAlgorithm:
         self.num_steps = self.config["ccea"]["num_steps"]
 
         if self.num_rovers > 0:
-            self.num_rover_sectors = int(360 / self.config["env"]["agents"]["rovers"][0]["resolution"])
+            self.num_rover_sectors = int(360 / self.config["env"]["rovers"][0]["resolution"])
             self.rover_nn_template = self.generateTemplateNN(self.num_rover_sectors)
             self.rover_nn_size = self.rover_nn_template.num_params
 
         self.use_multiprocessing = self.config["processing"]["use_multiprocessing"]
         self.num_threads = self.config["processing"]["num_threads"]
 
+        # Data loading
+        self.load_checkpoint = self.config["data"]["load_checkpoint"]
+        self.load_checkpoint_filename = self.config["data"]["load_checkpoint_filename"]
+
         # Data saving variables
-        self.save_trajectories = self.config["data"]["save_trajectories"]["switch"]
-        self.num_gens_between_save_traj = self.config["data"]["save_trajectories"]["num_gens_between_save"]
+        self.save_trajectories = self.config["data"]["save_trajectories"]
+        self.save_checkpoint = self.config["data"]["save_checkpoint"]
+        self.num_gens_between_save = self.config["data"]["num_gens_between_save"]
 
         # Create the type of fitness we're optimizing
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -121,6 +135,10 @@ class CooperativeCoevolutionaryAlgorithm:
                     hidden_size=self.num_hidden[0],
                     output_size=2,
                     num_layers=1,
+                ).to(DEVICE)
+            case "CNN":
+                agent_nn = CNN_Policy(
+                    img_size=self.image_size,
                 ).to(DEVICE)
             case "MLP":
                 agent_nn = MLP_Policy(
@@ -208,7 +226,7 @@ class CooperativeCoevolutionaryAlgorithm:
         rover_nns = [deepcopy(self.rover_nn_template) for _ in range(self.num_rovers)]
 
         # Load in the weights
-        for rover_nn, individual in zip(rover_nns, team[: self.num_rovers]):
+        for rover_nn, individual in zip(rover_nns, team):
             rover_nn.set_params(torch.tensor(individual, dtype=torch.double).to(DEVICE))
 
         agent_nns = rover_nns
@@ -248,8 +266,20 @@ class CooperativeCoevolutionaryAlgorithm:
             for ind, (observation, agent_nn) in enumerate(zip(observations, agent_nns)):
 
                 obs_tensor = observation.data()
-                obs_tensor.reshape((8,))  # State space is 8 dimensional
-                obs_tensor = np.frombuffer(obs_tensor, dtype=np.double, count=8)
+
+                # State pre processing based on sensor type
+                match (self.sensor_type):
+                    case "lidar":
+                        obs_tensor.reshape((8,))  # State space is 8 dimensional
+                        obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=8)
+                    case "camera":
+                        flat_img_size = int(np.pow(self.image_size, 2) * 2)
+                        obs_tensor.reshape((flat_img_size,))
+                        obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=flat_img_size)
+                        obs_tensor = np.reshape(
+                            obs_tensor, (2, self.image_size, self.image_size)
+                        )  # 2 channels since we have a POI image and a Rover Image
+
                 obs_tensor = torch.from_numpy(obs_tensor).to(DEVICE)
 
                 action = agent_nn.forward(obs_tensor.unsqueeze(0))
@@ -297,16 +327,15 @@ class CooperativeCoevolutionaryAlgorithm:
                 case "last_step":
                     team_fitness = G_list[-1]
 
-            fitnesses = tuple([(r,) for r in rewards] + [(team_fitness,)])
-
         else:
             # Each index corresponds to an agent's rewards
             # We only evaulate the team fitness based on the last step
             # so we only keep the last set of rewards generated by the team
-            fitnesses = tuple([(r,) for r in rewards])
+            team_fitness = None
 
         return EvalInfo(
-            fitnesses=fitnesses,
+            agent_fitnesses=rewards,
+            team_fitness=team_fitness,
             joint_trajectory=JointTrajectory(
                 joint_state_trajectory,
                 joint_observation_trajectory,
@@ -364,8 +393,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # In that case, we need to aggregate those many evaluations into one fitness
         if self.num_evaluations_per_team == 1:
             for team, eval_info in zip(teams, eval_infos):
-                fitnesses = eval_info.fitnesses
-                for individual, fit in zip(team, fitnesses):
+                for individual, fit in zip(team, eval_info.agent_fitnesses):
                     individual.fitness.values = fit
         else:
             team_list = []
@@ -375,20 +403,23 @@ class CooperativeCoevolutionaryAlgorithm:
                 eval_info_list.append(eval_info)
 
             for team_id, team in enumerate(team_list[:: self.num_evaluations_per_team]):
+
                 # Get all the eval infos for this team
                 team_eval_infos = eval_info_list[
                     team_id * self.num_evaluations_per_team : (team_id + 1) * self.num_evaluations_per_team
                 ]
+
                 # Aggregate the fitnesses into a big numpy array
-                all_fitnesses = [eval_info.fitnesses for eval_info in team_eval_infos]
+                all_fitnesses = [eval_info.agent_fitnesses for eval_info in team_eval_infos]
                 average_fitnesses = [0 for _ in range(len(all_fitnesses[0]))]
                 for fitnesses in all_fitnesses:
                     for count, fit in enumerate(fitnesses):
-                        average_fitnesses[count] += fit[0]
+                        average_fitnesses[count] += fit
                 for ind in range(len(average_fitnesses)):
                     average_fitnesses[ind] = average_fitnesses[ind] / self.num_evaluations_per_team
+
                 # And now get that back to the individuals
-                fitnesses = tuple([(f,) for f in average_fitnesses])
+                fitnesses = tuple([(f,) for f in average_fitnesses])  # Put into tuples due to deap.base.Fitness type
                 for individual, fit in zip(team, fitnesses):
                     individual.fitness.values = fit
 
@@ -417,8 +448,8 @@ class CooperativeCoevolutionaryAlgorithm:
 
         if len(eval_infos) == 1:
             eval_info = eval_infos[0]
-            team_fit = str(eval_info.fitnesses[-1][0])
-            agent_fits = [str(fit[0]) for fit in eval_info.fitnesses[:-1]]
+            team_fit = str(eval_info.team_fitness)
+            agent_fits = [str(fit) for fit in eval_info.agent_fitnesses]
             fit_list = [gen, team_fit] + agent_fits
             fit_str = ",".join(fit_list) + "\n"
 
@@ -428,14 +459,13 @@ class CooperativeCoevolutionaryAlgorithm:
                 team_eval_infos.append(eval_info)
 
             # Aggergate the fitnesses into a big numpy array
-            num_ind_per_team = len(team_eval_infos[0].fitnesses)
+            num_ind_per_team = len(team_eval_infos[0].agent_fitnesses) + 1  # +1 to include team fitness
             all_fit = np.zeros(shape=(self.num_evaluations_per_team, num_ind_per_team))
 
             for num_eval, eval_info in enumerate(team_eval_infos):
-                fitnesses = eval_info.fitnesses
-                for num_ind, fit in enumerate(fitnesses):
-                    all_fit[num_eval, num_ind] = fit[0]
-                all_fit[num_eval, -1] = fitnesses[-1][0]
+                for num_ind, fit in enumerate(eval_info.agent_fitnesses):
+                    all_fit[num_eval, num_ind] = fit
+                all_fit[num_eval, -1] = eval_info.team_fitness
 
             # Now compute a sum/average/min/etc dependending on what config specifies
             agg_fit = np.average(all_fit, axis=0)
@@ -527,15 +557,23 @@ class CooperativeCoevolutionaryAlgorithm:
             self.gen = 0
 
             # Create directory for saving data
-            trial_dir = self.trials_dir / ("trial_" + str(num_trial))
+            trial_dir = self.trials_dir / (f"trial_{str(num_trial)}_{self.trial_name}")
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
 
             # Create csv file for saving evaluation fitnesses
             self.createEvalFitnessCSV(trial_dir)
 
-            # Initialize the population
-            pop = self.population()
+            # Initialize the population or load models
+            if self.load_checkpoint:
+
+                with open(trial_dir / self.load_checkpoint_filename, "rb") as handle:
+                    checkpoint = pickle.load(handle)
+                    pop = checkpoint["population"]
+                    self.gen = checkpoint["last_gen"]
+
+            else:
+                pop = self.population()
 
             # Create the teams
             teams = self.formTeams(pop)
@@ -556,9 +594,14 @@ class CooperativeCoevolutionaryAlgorithm:
             if self.save_trajectories:
                 self.writeEvalTrajs(trial_dir, eval_infos)
 
-            for gen in tqdm(range(self.config["ccea"]["num_generations"])):
+            for i in tqdm(range(self.config["ccea"]["num_generations"])):
+
+                # Get loading bar up to checkpoint
+                if self.load_checkpoint and i <= self.gen:
+                    continue
+
                 # Update gen counter
-                self.gen = gen + 1
+                self.gen += 1
 
                 # Perform selection
                 offspring = self.select(pop)
@@ -579,18 +622,28 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Now assign fitnesses to each individual
                 self.assignFitnesses(teams, eval_infos)
 
-                # Evaluate a team with the best indivdiual from each subpopulation
+                # Evaluate a team with the best individual from each subpopulation
                 eval_infos = self.evaluateEvaluationTeam(offspring)
+
+                # Now populate the population with individuals from the offspring
+                self.setPopulation(pop, offspring)
 
                 # Save fitnesses
                 self.writeEvalFitnessCSV(trial_dir, eval_infos)
 
-                # Save trajectories
-                if self.save_trajectories and self.gen % self.num_gens_between_save_traj == 0:
-                    self.writeEvalTrajs(trial_dir, eval_infos)
+                # Save trajectories and checkpoint
+                if self.gen % self.num_gens_between_save == 0:
 
-                # Now populate the population with individuals from the offspring
-                self.setPopulation(pop, offspring)
+                    if self.save_trajectories:
+                        self.writeEvalTrajs(trial_dir, eval_infos)
+
+                    if self.save_checkpoint:
+                        with open(trial_dir / self.load_checkpoint_filename, "wb") as handle:
+                            pickle.dump(
+                                {"population": pop, "last_gen": self.gen},
+                                handle,
+                                protocol=pickle.HIGHEST_PROTOCOL,
+                            )
 
         if self.use_multiprocessing:
             self.pool.close()
