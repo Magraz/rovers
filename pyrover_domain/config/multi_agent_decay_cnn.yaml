@@ -2,58 +2,50 @@ env:
 
   rovers:
     - observation_radius: 1000.0
-      reward_type: Difference
-      resolution: 90
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 25.0]
-
-    - observation_radius: 1000.0
-      reward_type: Difference
+      reward_type: difference
+      sensor_type: camera
       resolution: 90
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
     
     - observation_radius: 1000.0
-      reward_type: Difference
-      resolution: 90
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 25.0]
-    
-    - observation_radius: 1000.0
-      reward_type: Difference
+      reward_type: difference
+      sensor_type: camera
       resolution: 90
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
 
   pois:
-    - type: static
-      value: 1.0
-      observation_radius: 5.0
+    - type: decay
+      value: 40.0
+      observation_radius: 2.5
       coupling: 2
+      lifespan: 0.25
       position:
         spawn_rule: fixed
-        fixed: [10.0, 40.0]
+        fixed: [15.0, 15.0]
     
-    - type: static
-      value: 1.0
-      observation_radius: 5.0
+    - type: decay
+      value: 20.0
+      observation_radius: 2.5
       coupling: 2
+      lifespan: 0.5
       position:
         spawn_rule: fixed
-        fixed: [40.0, 10.0]
-    
-    - type: static
-      value: 1.0
-      observation_radius: 5.0
+        fixed: [25.0, 10.0]
+
+    - type: decay
+      value: 10.0
+      observation_radius: 2.5
       coupling: 2
+      lifespan: 0.75
       position:
         spawn_rule: fixed
-        fixed: [10.0, 10.0]
-          
+        fixed: [35.0, 15.0]
+
+  img_sensor_size: 25
   map_size: [50.0, 50.0]
 
 ccea:
@@ -63,8 +55,8 @@ ccea:
     upper_bound: 0.5
 
   model:
-    type: MLP #GRU/MLP
-    hidden_layers: [10]
+    type: CNN #GRU/MLP
+    hidden_layers: [32]
     rover_max_velocity: 1.0
 
   population:
@@ -75,7 +67,7 @@ ccea:
     evaluation_method: HallOfFame
 
     multi_evaluation:
-      num_evaluations: 20
+      num_evaluations: 10
       aggregation_method: average
 
     hall_of_fame:
@@ -93,10 +85,10 @@ ccea:
 
   mutation:
     mean: 0.0
-    std_deviation: 0.1
+    std_deviation: 0.2
     independent_probability: 0.5
 
-  num_steps: 30
+  num_steps: 200
   num_generations: 1000
 
 processing:
@@ -104,11 +96,11 @@ processing:
   num_threads: 10
 
 experiment:
-  trial_name: multi_mlp_regular
+  trial_name: multi_cnn_decay
   num_trials: 1
   
 data:
-  load_checkpoint: True
+  load_checkpoint: False
   load_checkpoint_filename: checkpoint.pickle
   save_trajectories: True
   save_checkpoint: True

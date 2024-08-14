@@ -2,14 +2,16 @@ env:
 
   rovers:
     - observation_radius: 1000.0
-      reward_type: Difference
+      reward_type: difference
+      sensor_type: lidar
       resolution: 90
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
-    
+
     - observation_radius: 1000.0
-      reward_type: Difference
+      reward_type: difference
+      sensor_type: lidar
       resolution: 90
       position:
         spawn_rule: fixed
@@ -24,7 +26,7 @@ env:
       position:
         spawn_rule: fixed
         fixed: [15.0, 15.0]
-    
+
     - type: decay
       value: 20.0
       observation_radius: 2.5
@@ -42,7 +44,8 @@ env:
       position:
         spawn_rule: fixed
         fixed: [35.0, 15.0]
-          
+
+  img_sensor_size: 25
   map_size: [50.0, 50.0]
 
 ccea:
@@ -52,7 +55,7 @@ ccea:
     upper_bound: 0.5
 
   model:
-    type: MLP #GRU/MLP
+    type: MLP
     hidden_layers: [32]
     rover_max_velocity: 1.0
 
@@ -86,7 +89,7 @@ ccea:
     independent_probability: 0.5
 
   num_steps: 200
-  num_generations: 1000
+  num_generations: 2000
 
 processing:
   use_multiprocessing: True
@@ -97,7 +100,7 @@ experiment:
   num_trials: 1
   
 data:
-  load_checkpoint: True
+  load_checkpoint: False
   load_checkpoint_filename: checkpoint.pickle
   save_trajectories: True
   save_checkpoint: True
