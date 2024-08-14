@@ -86,7 +86,7 @@ ccea:
     hall_of_fame:
       alpha: 0.5
     
-    fitness_method: aggregate #aggregate/last_step
+    fitness_method: last_step #aggregate/last_step
 
   selection:
 

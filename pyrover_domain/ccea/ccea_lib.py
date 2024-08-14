@@ -70,7 +70,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.model_type = self.config["ccea"]["model"]["type"]
 
         self.sensor_type = self.config["env"]["rovers"][0]["sensor_type"]
-        self.image_size = int(np.ceil(self.config["env"]["map_size"][0] / 2))
+        self.image_size = self.config["env"]["img_sensor_size"]
 
         self.num_pois = len(self.config["env"]["pois"])
 
@@ -485,33 +485,35 @@ class CooperativeCoevolutionaryAlgorithm:
             file.write(fit_str)
 
     def writeEvalTrajs(self, trial_dir, eval_infos):
-        gen_folder_name = "gen_" + str(self.gen)
-        gen_dir = trial_dir / gen_folder_name
+        gen_folder_name = f"gen_{self.gen}"
+        gen_dir = f"{trial_dir}/{gen_folder_name}"
 
         if not os.path.isdir(gen_dir):
             os.makedirs(gen_dir)
 
         for eval_id, eval_info in enumerate(eval_infos):
-            eval_filename = "eval_team_" + str(eval_id) + "_joint_traj.csv"
-            eval_dir = gen_dir / eval_filename
+
+            eval_filename = f"eval_team_{eval_id}_joint_traj.csv"
+            eval_dir = f"{gen_dir}/{eval_filename}"
+
             with open(eval_dir, "w") as file:
                 # Build up the header (labels at the top of the csv)
                 header = ""
                 # First the states (agents and POIs)
                 for i in range(self.num_rovers):
-                    header += "rover_" + str(i) + "_x,rover_" + str(i) + "_y,"
+                    header += f"rover_{i}_x,rover_{i}_y,"
 
                 for i in range(self.num_pois):
-                    header += "rover_poi_" + str(i) + "_x,rover_poi_" + str(i) + "_y,"
+                    header += f"rover_poi_{i}_x,rover_poi_{i}_y,"
 
                 # Observations
                 for i in range(self.num_rovers):
                     for j in range(self.num_rover_sectors * 2):
-                        header += "rover_" + str(i) + "_obs_" + str(j) + ","
+                        header += f"rover_{i}_obs_{i},"
 
                 # Actions
                 for i in range(self.num_rovers):
-                    header += "rover_" + str(i) + "_dx,rover_" + str(i) + "_dy,"
+                    header += f"rover_{i}_dx,rover_{i}_dy,"
 
                 header += "\n"
                 # Write out the header at the top of the csv
@@ -527,6 +529,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 action_padding = []
                 for action in joint_traj.actions[0]:
                     action_padding.append([None for _ in action])
+
                 joint_traj.actions.append(action_padding)
                 for joint_state, joint_observation, joint_action in zip(
                     joint_traj.states, joint_traj.observations, joint_traj.actions
@@ -536,16 +539,19 @@ class CooperativeCoevolutionaryAlgorithm:
                     for state in joint_state:
                         state_list += [str(state_var) for state_var in state]
                     state_str = ",".join(state_list)
+
                     # Aggregate observation info
                     observation_list = []
                     for observation in joint_observation:
                         observation_list += [str(obs_val) for obs_val in observation]
                     observation_str = ",".join(observation_list)
+
                     # Aggregate action info
                     action_list = []
                     for action in joint_action:
                         action_list += [str(act_val) for act_val in action]
                     action_str = ",".join(action_list)
+
                     # Put it all together
                     csv_line = state_str + "," + observation_str + "," + action_str + "\n"
                     # Write it out

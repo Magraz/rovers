@@ -64,7 +64,7 @@ def resolvePositionSpawnRule(position_dict):
 
 
 # Let's have a function that builds out the environment
-def createEnv(config, current_gen: int):
+def createEnv(config):
     Env = rovers.Environment[rovers.CustomInit]
 
     # Aggregate all of the positions of agents
@@ -79,22 +79,10 @@ def createEnv(config, current_gen: int):
         position = resolvePositionSpawnRule(poi["position"])
         poi_positions.append(position)
 
-    # Alter order of POI positions
-    if config["env"]["pois"]["alter_order"]["alter"]:
-
-        match (config["env"]["pois"]["alter_order"]["type"]):
-
-            case "reverse":
-                if np.choice(
-                    [True, False],
-                    p=[config["env"]["pois"]["alter_order"]["type"], 1 - config["env"]["pois"]["alter_order"]["type"]],
-                ):
-                    poi_positions = reversed(poi_positions)
-
     rovers_ = [
         createRover(
             obs_radius=rover["observation_radius"],
-            img_size=int(np.ceil(config["env"]["map_size"][0] / 2)),  # Watch a quarter of the map
+            img_size=config["env"]["img_sensor_size"],
             reward_type=rover["reward_type"],
             sensor_type=rover["sensor_type"],
             resolution=rover["resolution"],
