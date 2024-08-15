@@ -35,7 +35,7 @@ env:
 
   pois:
     - type: static
-      value: 1.0
+      value: 8.0
       observation_radius: 2.5
       coupling: 2
       position:
@@ -43,7 +43,7 @@ env:
         fixed: [15.0, 15.0]
 
     - type: static
-      value: 1.0
+      value: 2.0
       observation_radius: 2.5
       coupling: 2
       position:
@@ -51,7 +51,7 @@ env:
         fixed: [25.0, 10.0]
 
     - type: static
-      value: 1.0
+      value: 4.0
       observation_radius: 2.5
       coupling: 2
       position:
@@ -61,7 +61,7 @@ env:
   img_sensor_size: 25
   map_size: [50.0, 50.0]
 
-ccea:
+ccea: 
 
   weight_initialization:
     lower_bound: -0.5
@@ -69,7 +69,7 @@ ccea:
 
   model:
     type: MLP
-    hidden_layers: [10]
+    hidden_layers: [32]
     rover_max_velocity: 1.0
 
   population:
@@ -101,8 +101,8 @@ ccea:
     std_deviation: 0.2
     independent_probability: 0.5
 
-  num_steps: 50
-  num_generations: 1000
+  num_steps: 30
+  num_generations: 2000
 
 processing:
   use_multiprocessing: True
@@ -113,7 +113,7 @@ experiment:
   num_trials: 1
   
 data:
-  load_checkpoint: False
+  load_checkpoint: True
   load_checkpoint_filename: checkpoint.pickle
   save_trajectories: True
   save_checkpoint: True

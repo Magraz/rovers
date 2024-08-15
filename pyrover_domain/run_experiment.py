@@ -6,9 +6,9 @@ if __name__ == "__main__":
     mp.set_start_method("forkserver")
 
     # Set configuration file
-    # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_regular.yaml"
+    config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_regular_mlp.yaml"
     # config_dir = "/home/magraz/rovers/pyrover_domain/config/single_agent_decay.yaml"
-    config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_mlp.yaml"
+    # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_mlp.yaml"
     # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_cnn.yaml"
     # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_gru.yaml"
 

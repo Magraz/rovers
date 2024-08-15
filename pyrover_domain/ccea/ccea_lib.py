@@ -304,6 +304,7 @@ class CooperativeCoevolutionaryAlgorithm:
             agent_positions = [[agent.position().x, agent.position().y] for agent in env.rovers()]
             poi_positions = [[poi.position().x, poi.position().y] for poi in env.pois()]
 
+            # Store joint actions and states
             joint_observation_trajectory.append(observation_arrs)
             joint_action_trajectory.append(actions_arrs)
             joint_state_trajectory.append(agent_positions + poi_positions)
@@ -326,6 +327,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 case "last_step":
                     team_fitness = G_list[-1]
+                    rewards = np.array(rewards)
 
         else:
             # Each index corresponds to an agent's rewards
@@ -567,9 +569,6 @@ class CooperativeCoevolutionaryAlgorithm:
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
 
-            # Create csv file for saving evaluation fitnesses
-            self.createEvalFitnessCSV(trial_dir)
-
             # Initialize the population or load models
             if self.load_checkpoint:
 
@@ -581,24 +580,8 @@ class CooperativeCoevolutionaryAlgorithm:
             else:
                 pop = self.population()
 
-            # Create the teams
-            teams = self.formTeams(pop)
-
-            # Evaluate the teams
-            eval_infos = self.evaluateTeams(teams)
-
-            # Assign fitnesses to individuals
-            self.assignFitnesses(teams, eval_infos)
-
-            # Evaluate a team with the best indivdiual from each subpopulation
-            eval_infos = self.evaluateEvaluationTeam(pop)
-
-            # Save fitnesses of the evaluation team
-            self.writeEvalFitnessCSV(trial_dir, eval_infos)
-
-            # Save trajectories of evaluation team
-            if self.save_trajectories:
-                self.writeEvalTrajs(trial_dir, eval_infos)
+                # Create csv file for saving evaluation fitnesses
+                self.createEvalFitnessCSV(trial_dir)
 
             for i in tqdm(range(self.config["ccea"]["num_generations"])):
 
