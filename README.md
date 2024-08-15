@@ -1,4 +1,4 @@
-<!-- To Install -->
+### To Install
 
 Run the following commands:
 1. `pip install -r requirements.txt`
@@ -7,7 +7,7 @@ Run the following commands:
 4. `make clean && make release entry=rovers && ./build/bin/rovers`
 5. `pip install -e .`
 
-<!-- To Run Experiment-->
+### To Run Experiment
 
 Run the following command:
 - `python3 pyrover/run_experiment.py`
