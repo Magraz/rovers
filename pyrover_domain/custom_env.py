@@ -69,7 +69,7 @@ def createEnv(config):
 
     # Aggregate all of the positions of agents
     agent_positions = []
-    for rover in config["env"]["rovers"]:
+    for rover in config["env"]["rovers"][: config["env"]["team_size"]]:
         position = resolvePositionSpawnRule(rover["position"])
         agent_positions.append(position)
 
@@ -87,7 +87,7 @@ def createEnv(config):
             sensor_type=rover["sensor_type"],
             resolution=rover["resolution"],
         )
-        for rover in config["env"]["rovers"]
+        for rover in config["env"]["rovers"][: config["env"]["team_size"]]
     ]
 
     agents = rovers_

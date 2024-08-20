@@ -1,9 +1,13 @@
 from pyrover_domain.ccea.ccea_lib import runCCEA
 import torch.multiprocessing as mp
+from torch import set_grad_enabled
 
 if __name__ == "__main__":
     # Set for CUDA to allow multiprocessing
     mp.set_start_method("forkserver")
+
+    # Disable gradient calculations
+    set_grad_enabled(False)
 
     # Set configuration file
     config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_regular_mlp.yaml"

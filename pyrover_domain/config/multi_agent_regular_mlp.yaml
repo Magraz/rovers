@@ -32,6 +32,14 @@ env:
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
 
   pois:
     - type: static
@@ -59,6 +67,7 @@ env:
         fixed: [35.0, 15.0]
 
   img_sensor_size: 25
+  team_size: 4
   map_size: [50.0, 50.0]
 
 ccea: 
@@ -80,7 +89,7 @@ ccea:
     evaluation_method: HallOfFame
 
     multi_evaluation:
-      num_evaluations: 10
+      num_evaluations: 3
       aggregation_method: average
 
     hall_of_fame:
@@ -99,6 +108,7 @@ ccea:
   mutation:
     mean: 0.0
     std_deviation: 0.2
+    mutation_decay: 0.5
     independent_probability: 0.5
 
   num_steps: 30
@@ -113,7 +123,7 @@ experiment:
   num_trials: 1
   
 data:
-  load_checkpoint: True
+  load_checkpoint: False
   load_checkpoint_filename: checkpoint.pickle
   save_trajectories: True
   save_checkpoint: True

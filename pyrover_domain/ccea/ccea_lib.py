@@ -21,6 +21,10 @@ import yaml
 import logging
 import pickle
 
+import uuid
+
+from itertools import combinations
+
 # Create and configure logger
 logging.basicConfig(format="%(asctime)s %(message)s")
 
@@ -33,7 +37,22 @@ logger.setLevel(logging.INFO)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-class JointTrajectory:
+class Agent(object):
+    def __init__(self, type_idx: int, parameters: list, teams_im_in: list = None):
+        self.type_idx = type_idx
+        self.parameters = parameters
+        self.teams_im_in = teams_im_in if teams_im_in is not None else []
+        self.unique_id = uuid.uuid4()
+
+
+class Team(object):
+    def __init__(self, idx: int = -1, individuals: list[Agent] = None, combination: list = None):
+        self.idx = idx
+        self.individuals = individuals if individuals is not None else []
+        self.combination = combination if combination is not None else []
+
+
+class JointTrajectory(object):
     def __init__(
         self,
         joint_state_trajectory,
@@ -45,7 +64,7 @@ class JointTrajectory:
         self.actions = joint_action_trajectory
 
 
-class EvalInfo:
+class EvalInfo(object):
     def __init__(self, agent_fitnesses, team_fitness, joint_trajectory):
         self.agent_fitnesses = agent_fitnesses
         self.team_fitness = team_fitness
@@ -65,7 +84,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Start by setting up variables for different agents
         self.num_rovers = len(self.config["env"]["rovers"])
+        self.team_size = self.config["env"]["team_size"]
         self.subpopulation_size = self.config["ccea"]["population"]["subpopulation_size"]
+
         self.num_hidden = self.config["ccea"]["model"]["hidden_layers"]
         self.model_type = self.config["ccea"]["model"]["type"]
 
@@ -85,10 +106,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.num_steps = self.config["ccea"]["num_steps"]
 
-        if self.num_rovers > 0:
-            self.num_rover_sectors = int(360 / self.config["env"]["rovers"][0]["resolution"])
-            self.rover_nn_template = self.generateTemplateNN(self.num_rover_sectors)
-            self.rover_nn_size = self.rover_nn_template.num_params
+        self.num_rover_sectors = int(360 / self.config["env"]["rovers"][0]["resolution"])
+        self.rover_nn_template = self.generateTemplateNN(self.num_rover_sectors)
+        self.rover_nn_size = self.rover_nn_template.num_params
 
         self.use_multiprocessing = self.config["processing"]["use_multiprocessing"]
         self.num_threads = self.config["processing"]["num_threads"]
@@ -104,10 +124,39 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Create the type of fitness we're optimizing
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        creator.create("Individual", list, fitness=creator.FitnessMax)
+        creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
         # Now set up the toolbox
         self.toolbox = base.Toolbox()
+
+        self.toolbox.register(
+            "attr_weight",
+            random.uniform,
+            self.config["ccea"]["weight_initialization"]["lower_bound"],
+            self.config["ccea"]["weight_initialization"]["upper_bound"],
+        )
+
+        self.toolbox.register(
+            "individual", tools.initRepeat, creator.Individual, self.toolbox.attr_weight, n=self.rover_nn_size
+        )
+
+        self.toolbox.register(
+            "subpopulation",
+            tools.initRepeat,
+            list,
+            self.toolbox.individual,
+            n=self.config["ccea"]["population"]["subpopulation_size"],
+        )
+
+        self.toolbox.register(
+            "population",
+            tools.initRepeat,
+            list,
+            self.toolbox.subpopulation,
+            n=self.num_rovers,
+        )
+
+        # Set up multi processing methods
         if self.use_multiprocessing:
             self.pool = mp.Pool(processes=self.num_threads)
             self.map = self.pool.map_async
@@ -149,61 +198,58 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return agent_nn
 
-    def generateWeight(self):
-        return random.uniform(
-            self.config["ccea"]["weight_initialization"]["lower_bound"],
-            self.config["ccea"]["weight_initialization"]["upper_bound"],
-        )
-
-    def generateIndividual(self, individual_size):
-        return tools.initRepeat(creator.Individual, self.generateWeight, n=individual_size)
-
-    def generateRoverIndividual(self):
-        return self.generateIndividual(individual_size=self.rover_nn_size)
-
-    def generateRoverSubpopulation(self):
-        return tools.initRepeat(
-            list,
-            self.generateRoverIndividual,
-            n=self.config["ccea"]["population"]["subpopulation_size"],
-        )
-
-    def population(self):
-        return tools.initRepeat(list, self.generateRoverSubpopulation, n=self.num_rovers)
-
-    def formEvaluationTeam(self, population):
-        eval_team = []
+    def formBestTeam(self, population) -> Team:
+        eval_team = Team()
         for subpop in population:
             # Use max with a key function to get the individual with the highest fitness[0] value
-            best_ind = max(subpop, key=lambda ind: ind.fitness.values[0])
-            eval_team.append(best_ind)
+            best_ind = max(subpop, key=lambda ind: ind.fitness.values[0] if (len(ind.fitness.values) > 0) else 0.0)
+            eval_team.individuals.append(Agent(type_idx=-1, parameters=best_ind))
         return eval_team
 
-    def evaluateEvaluationTeam(self, population):
+    def evaluateBestTeam(self, population):
         # Create evaluation team
-        eval_team = self.formEvaluationTeam(population)
+        eval_team = self.formBestTeam(population)
         # Evaluate that team however many times we are evaluating teams
         eval_teams = [eval_team for _ in range(self.num_evaluations_per_team)]
         return self.evaluateTeams(eval_teams)
 
-    def formTeams(self, population, inds=None):
+    def formTeams(self, population, use_combinations=False) -> list[Team]:
         # Start a list of teams
         teams = []
 
-        if inds is None:
-            team_inds = range(self.subpopulation_size)
-        else:
-            team_inds = inds
+        if use_combinations:
+            combination_idx = 0
+            team_combinations = [combo for combo in combinations(range(self.num_rovers), self.team_size)]
+            teams_per_combination = 10
+            teams_per_combination_list = [
+                i
+                for i in range(
+                    teams_per_combination, self.subpopulation_size + teams_per_combination, teams_per_combination
+                )
+            ]
 
         # For each individual in a subpopulation
-        for i in team_inds:
+        for i in range(self.subpopulation_size):
+
+            # Choose combination
+            if use_combinations and (i == teams_per_combination_list[combination_idx]):
+                combination_idx += 1
+
             # Make a team
-            team = []
+            team = Team(idx=i)
+            agents = [Agent(type_idx=idx, parameters=subpop[i]) for idx, subpop in enumerate(population)]
 
             # For each subpopulation in the population
-            for subpop in population:
-                # Put the i'th indiviudal on the team
-                team.append(subpop[i])
+            for agent in agents:
+                if use_combinations:
+                    # Put the i'th individual on the team if it is inside our team combinations
+                    if agent.type_idx in team_combinations[combination_idx]:
+                        team.individuals.append(agent)
+                        team.combination.append(agent.type_idx)
+                else:
+                    # Put the i'th indiviudal on the team
+                    team.individuals.append(agent)
+                    team.combination.append(agent.type_idx)
 
             # Need to save that team for however many evaluations
             # we're doing per team
@@ -213,7 +259,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return teams
 
-    def evaluateTeams(self, teams):
+    def evaluateTeams(self, teams: list[Team]):
         if self.use_multiprocessing:
             jobs = self.map(self.evaluateTeam, teams)
             eval_infos = jobs.get()
@@ -221,24 +267,26 @@ class CooperativeCoevolutionaryAlgorithm:
             eval_infos = list(self.map(self.evaluateTeam, teams))
         return eval_infos
 
-    def evaluateTeam(self, team, compute_team_fitness=True):
+    def evaluateTeam(self, team: Team):
         # Set up models
-        rover_nns = [deepcopy(self.rover_nn_template) for _ in range(self.num_rovers)]
+        rover_nns = [deepcopy(self.rover_nn_template) for _ in range(self.team_size)]
 
         # Load in the weights
-        for rover_nn, individual in zip(rover_nns, team):
-            rover_nn.set_params(torch.tensor(individual, dtype=torch.double).to(DEVICE))
+        for rover_nn, individual in zip(rover_nns, team.individuals):
+            rover_nn.set_params(torch.from_numpy(individual.parameters).to(DEVICE))
 
         agent_nns = rover_nns
 
         # Set up the enviornment
         env = createEnv(self.config)
 
+        # Get initial observations per agent
         observations, _ = env.reset()
 
         agent_positions = [[agent.position().x, agent.position().y] for agent in env.rovers()]
         poi_positions = [[poi.position().x, poi.position().y] for poi in env.pois()]
 
+        # Change observations type to numpy
         observations_arrs = []
 
         for observation in observations:
@@ -250,12 +298,14 @@ class CooperativeCoevolutionaryAlgorithm:
             observation_arr = np.array(observation_arr, dtype=np.float64)
             observations_arrs.append(observation_arr)
 
+        # Set evaluation storage variables
         joint_state_trajectory = [agent_positions + poi_positions]
         joint_observation_trajectory = [observations_arrs]
         joint_action_trajectory = []
         rewards_list = []
         G_list = []
 
+        # Start evaluation
         for _ in range(self.num_steps):
 
             # Compute the actions of all rovers
@@ -269,9 +319,11 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # State pre processing based on sensor type
                 match (self.sensor_type):
+
                     case "lidar":
-                        obs_tensor.reshape((8,))  # State space is 8 dimensional
+                        obs_tensor.reshape((self.num_rover_sectors * 2,))  # State space is 8 dimensional
                         obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=8)
+
                     case "camera":
                         flat_img_size = int(np.pow(self.image_size, 2) * 2)
                         obs_tensor.reshape((flat_img_size,))
@@ -317,23 +369,16 @@ class CooperativeCoevolutionaryAlgorithm:
 
             G_list.append(rovers.rewards.Global().compute(agent_pack))
 
-        if compute_team_fitness:
+        # Compute team fitness
+        match (self.fitness_method):
 
-            match (self.fitness_method):
+            case "aggregate":
+                rewards = np.sum(np.array(rewards_list), axis=0)
+                team_fitness = sum(G_list)
 
-                case "aggregate":
-                    rewards = np.sum(np.array(rewards_list), axis=0)
-                    team_fitness = sum(G_list)
-
-                case "last_step":
-                    team_fitness = G_list[-1]
-                    rewards = np.array(rewards)
-
-        else:
-            # Each index corresponds to an agent's rewards
-            # We only evaulate the team fitness based on the last step
-            # so we only keep the last set of rewards generated by the team
-            team_fitness = None
+            case "last_step":
+                rewards = np.array(rewards)
+                team_fitness = G_list[-1]
 
         return EvalInfo(
             agent_fitnesses=rewards,
@@ -359,7 +404,7 @@ class CooperativeCoevolutionaryAlgorithm:
             mutant_id = num_individual + self.n_elites
             for subpop in population:
                 self.mutateIndividual(subpop[mutant_id])
-                del subpop[mutant_id].fitness.values
+                subpop[mutant_id].fitness.values = (np.float64(0.0),)
 
     def selectSubPopulation(self, subpopulation):
         # Get the best N individuals
@@ -389,25 +434,20 @@ class CooperativeCoevolutionaryAlgorithm:
         for subpop in population:
             random.shuffle(subpop)
 
-    def assignFitnesses(self, teams, eval_infos):
+    def assignFitnesses(self, teams: list[Team], eval_infos: list[EvalInfo]):
         # There may be several eval_infos for the same team
         # This is the case if there are many evaluations per team
         # In that case, we need to aggregate those many evaluations into one fitness
         if self.num_evaluations_per_team == 1:
             for team, eval_info in zip(teams, eval_infos):
-                for individual, fit in zip(team, eval_info.agent_fitnesses):
-                    individual.fitness.values = fit
+                for individual, fit in zip(team.individuals, eval_info.agent_fitnesses):
+                    individual.parameters.fitness.values = fit
         else:
-            team_list = []
-            eval_info_list = []
-            for team, eval_info in zip(teams, eval_infos):
-                team_list.append(team)
-                eval_info_list.append(eval_info)
 
-            for team_id, team in enumerate(team_list[:: self.num_evaluations_per_team]):
+            for team_id, team in enumerate(teams[:: self.num_evaluations_per_team]):
 
                 # Get all the eval infos for this team
-                team_eval_infos = eval_info_list[
+                team_eval_infos = eval_infos[
                     team_id * self.num_evaluations_per_team : (team_id + 1) * self.num_evaluations_per_team
                 ]
 
@@ -422,8 +462,8 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # And now get that back to the individuals
                 fitnesses = tuple([(f,) for f in average_fitnesses])  # Put into tuples due to deap.base.Fitness type
-                for individual, fit in zip(team, fitnesses):
-                    individual.fitness.values = fit
+                for individual, fit in zip(team.individuals, fitnesses):
+                    individual.parameters.fitness.values = fit
 
     def setPopulation(self, population, offspring):
         for subpop, subpop_offspring in zip(population, offspring):
@@ -457,6 +497,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         else:
             team_eval_infos = []
+
             for eval_info in eval_infos:
                 team_eval_infos.append(eval_info)
 
@@ -471,10 +512,12 @@ class CooperativeCoevolutionaryAlgorithm:
 
             # Now compute a sum/average/min/etc dependending on what config specifies
             agg_fit = np.average(all_fit, axis=0)
+
             # And now record it all, starting with the aggregated one
             agg_team_fit = str(agg_fit[-1])
             agg_agent_fits = [str(fit) for fit in agg_fit[:-1]]
             fit_str = gen + "," + ",".join([agg_team_fit] + agg_agent_fits) + ","
+
             # And now add all the fitnesses from individual trials
             # Each row should have the fitnesses for an evaluation
             for row in all_fit:
@@ -482,6 +525,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 agent_fits = [str(fit) for fit in row[:-1]]
                 fit_str += ",".join([team_fit] + agent_fits)
             fit_str += "\n"
+
         # Now save it all to the csv
         with open(eval_fitness_dir, "a") as file:
             file.write(fit_str)
@@ -502,19 +546,19 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Build up the header (labels at the top of the csv)
                 header = ""
                 # First the states (agents and POIs)
-                for i in range(self.num_rovers):
+                for i in range(self.team_size):
                     header += f"rover_{i}_x,rover_{i}_y,"
 
                 for i in range(self.num_pois):
                     header += f"rover_poi_{i}_x,rover_poi_{i}_y,"
 
                 # Observations
-                for i in range(self.num_rovers):
+                for i in range(self.team_size):
                     for j in range(self.num_rover_sectors * 2):
                         header += f"rover_{i}_obs_{i},"
 
                 # Actions
-                for i in range(self.num_rovers):
+                for i in range(self.team_size):
                     header += f"rover_{i}_dx,rover_{i}_dy,"
 
                 header += "\n"
@@ -578,7 +622,7 @@ class CooperativeCoevolutionaryAlgorithm:
                     self.gen = checkpoint["last_gen"]
 
             else:
-                pop = self.population()
+                pop = self.toolbox.population()
 
                 # Create csv file for saving evaluation fitnesses
                 self.createEvalFitnessCSV(trial_dir)
@@ -603,7 +647,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.shuffle(offspring)
 
                 # Form teams for evaluation
-                teams = self.formTeams(offspring)
+                teams = self.formTeams(offspring, use_combinations=True)
 
                 # Evaluate each team
                 eval_infos = self.evaluateTeams(teams)
@@ -612,7 +656,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.assignFitnesses(teams, eval_infos)
 
                 # Evaluate a team with the best individual from each subpopulation
-                eval_infos = self.evaluateEvaluationTeam(offspring)
+                eval_infos = self.evaluateBestTeam(offspring)
 
                 # Now populate the population with individuals from the offspring
                 self.setPopulation(pop, offspring)
