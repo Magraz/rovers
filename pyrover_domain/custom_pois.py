@@ -62,3 +62,33 @@ class DecayPOI(rovers.IPOI):
                 self.visible = False
 
         self.time_step += 1
+
+
+class BlinkPOI(rovers.IPOI):
+    def __init__(
+        self,
+        value: float,
+        obs_radius: float,
+        constraintPolicy: rovers.IConstraint,
+        blink_prob: float,
+    ):
+        super().__init__(value, obs_radius)
+
+        # we will use the stealth combined with a constraint defined in the lib
+        self.time_step = 0
+        self.constraintPolicy = constraintPolicy
+        self.visible = True
+        self.blink_prob = blink_prob
+
+    # Use a library defined or custom constraint policy with stealth
+    def constraint_satisfied(self, entity_pack):
+
+        if not self.visible:
+            return False  # "you can't see me"
+
+        return self.constraintPolicy.is_satisfied(entity_pack)
+
+    # tick() is called at every time step (tick) by the library.
+    # blink based on a coin toss and stealth mastery
+    def tick(self):
+        self.visible = np.random.choice([True, False], 1, p=[self.blink_prob, 1 - self.blink_prob])[0]

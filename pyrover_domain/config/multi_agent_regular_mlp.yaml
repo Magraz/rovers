@@ -51,7 +51,7 @@ env:
         fixed: [15.0, 15.0]
 
     - type: static
-      value: 2.0
+      value: 2.0  
       observation_radius: 2.5
       coupling: 2
       position:
@@ -70,15 +70,17 @@ env:
   team_size: 4
   map_size: [50.0, 50.0]
 
+teaming:
+  use_teaming: True
+  team_size: 4
+
 ccea: 
 
-  weight_initialization:
-    lower_bound: -0.5
-    upper_bound: 0.5
+  weight_initialization: "kaiming"
 
   model:
     type: MLP
-    hidden_layers: [32]
+    hidden_layers: [64, 64]
     rover_max_velocity: 1.0
 
   population:
@@ -112,10 +114,10 @@ ccea:
     independent_probability: 0.5
 
   num_steps: 30
-  num_generations: 2000
+  num_generations: 8000
 
 processing:
-  use_multiprocessing: True
+  use_multiprocessing: False
   num_threads: 10
 
 experiment:
@@ -123,7 +125,7 @@ experiment:
   num_trials: 1
   
 data:
-  load_checkpoint: False
+  load_checkpoint: True
   load_checkpoint_filename: checkpoint.pickle
   save_trajectories: True
   save_checkpoint: True
