@@ -117,7 +117,7 @@ ccea:
   num_generations: 8000
 
 processing:
-  use_multiprocessing: False
+  use_multiprocessing: True
   num_threads: 10
 
 experiment:
@@ -125,7 +125,7 @@ experiment:
   num_trials: 1
   
 data:
-  load_checkpoint: True
+  load_checkpoint: False
   load_checkpoint_filename: checkpoint.pickle
   save_trajectories: True
   save_checkpoint: True
