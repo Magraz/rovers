@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     # Arg parser variables
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hpc", help="use hpc config files")
+    parser.add_argument("--hpc", help="use hpc config files", action="store_true")
     args = parser.parse_args()
 
     # Set base_config path
