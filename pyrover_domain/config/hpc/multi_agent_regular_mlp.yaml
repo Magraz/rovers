@@ -118,7 +118,7 @@ ccea:
 
 processing:
   use_multiprocessing: True
-  num_threads: 10
+  num_threads: 8
 
 experiment:
   trial_name: multi_mlp_regular
