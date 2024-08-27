@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # Set base_config path
     config_dir = "/home/magraz/rovers/pyrover_domain/config/experiments"
     if args.hpc:
-        config_dir = "/nfs/stak/users/agrazvam/rovers/pyrover_domain/config/experiments/hpc"
+        config_dir = "/home/rovers/pyrover_domain/config/experiments/hpc"
 
     # Set configuration file
     config_dir = f"{config_dir}/multi_agent_regular_mlp.yaml"
