@@ -18,9 +18,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set base_config path
-    config_dir = "/home/magraz/rovers/pyrover_domain/config/experiment_yamls/standard"
+    config_dir = "/home/magraz/rovers/pyrover_domain/experiments/yamls"
     if args.hpc:
-        config_dir = "/nfs/stak/users/agrazvam/config/experiment_yamls/hpc"
+        config_dir = "/nfs/stak/users/agrazvam/hpc-share/experiments/yamls
 
     # Set configuration file
     config_dir = f"{config_dir}/multi_agent_regular_mlp.yaml"
