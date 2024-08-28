@@ -74,7 +74,7 @@ class EvalInfo(object):
 class CooperativeCoevolutionaryAlgorithm:
     def __init__(self, config_dir):
         self.config_dir = Path(os.path.expanduser(config_dir))
-        self.trials_dir = f"{Path(self.config_dir).parents[2]}/results"
+        self.trials_dir = f"{Path(self.config_dir).parents[1]}/results"
 
         with open(str(self.config_dir), "r") as file:
             self.config = yaml.safe_load(file)
