@@ -377,7 +377,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 team_fitness = sum(G_list)
 
             case "last_step":
-                rewards = np.array(rewards)
+                rewards = np.array(list(rewards))
                 team_fitness = G_list[-1]
 
         return EvalInfo(
