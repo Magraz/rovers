@@ -87,7 +87,6 @@ ccea:
     subpopulation_size: 50
 
   evaluation:
-
     evaluation_method: HallOfFame
 
     multi_evaluation:
@@ -100,17 +99,15 @@ ccea:
     fitness_method: last_step #aggregate/last_step
 
   selection:
-
-    selection_method: NElitesBinaryTournament,
-
-    n_elites_binary_tournament:
-      n_elites: 5
-      include_elites_in_tournament: True
+    selection_method: NElitesBinaryTournament
+    n_elites: 5
+    n_elite_offspring: 0.2
 
   mutation:
     mean: 0.0
-    std_deviation: 0.2
-    mutation_decay: 0.5
+    min_std_deviation: 0.2
+    max_std_deviation: 0.6
+    lifespan: 0.8 #The higher, the slower the decay, value from 0-1
     independent_probability: 0.5
 
   num_steps: 30
@@ -122,11 +119,11 @@ processing:
 
 experiment:
   trial_name: multi_mlp_regular
-  num_trials: 1
+  num_trials: 3
   
 data:
-  load_checkpoint: False
+  num_gens_between_save: 20
   load_checkpoint_filename: checkpoint.pickle
+  load_checkpoint: False
   save_trajectories: True
   save_checkpoint: True
-  num_gens_between_save: 20
