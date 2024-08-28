@@ -74,7 +74,7 @@ class EvalInfo(object):
 class CooperativeCoevolutionaryAlgorithm:
     def __init__(self, config_dir):
         self.config_dir = Path(os.path.expanduser(config_dir))
-        self.trials_dir = self.config_dir.parent
+        self.trials_dir = f"{Path(self.config_dir).parents[2]}/results"
 
         with open(str(self.config_dir), "r") as file:
             self.config = yaml.safe_load(file)
@@ -98,11 +98,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.num_pois = len(self.config["env"]["pois"])
 
-        self.n_elites = self.config["ccea"]["selection"]["n_elites_binary_tournament"]["n_elites"]
-        self.include_elites_in_tournament = self.config["ccea"]["selection"]["n_elites_binary_tournament"][
-            "include_elites_in_tournament"
-        ]
+        self.n_elites = self.config["ccea"]["selection"]["n_elites"]
         self.num_mutants = self.subpopulation_size - self.n_elites
+        self.n_elite_offspring = round(self.config["ccea"]["selection"]["n_elite_offspring"] * self.num_mutants)
 
         if self.use_teaming:
             self.num_evaluations_per_team = len(self.team_combinations)
@@ -395,10 +393,16 @@ class CooperativeCoevolutionaryAlgorithm:
         )
 
     def mutateIndividual(self, individual):
+        mutation_lifespan = self.config["ccea"]["num_generations"] * self.config["ccea"]["mutation"]["lifespan"]
+
+        decay_rate = -np.log(self.config["ccea"]["mutation"]["min_std_deviation"]) / mutation_lifespan
+
+        mutation_stdev = self.config["ccea"]["mutation"]["max_std_deviation"] * np.power((1 - decay_rate), self.gen)
+
         return tools.mutGaussian(
             individual,
             mu=self.config["ccea"]["mutation"]["mean"],
-            sigma=self.config["ccea"]["mutation"]["std_deviation"],
+            sigma=mutation_stdev,
             indpb=self.config["ccea"]["mutation"]["independent_probability"],
         )
 
@@ -412,14 +416,16 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def selectSubPopulation(self, subpopulation):
         # Get the best N individuals
-        offspring = tools.selBest(subpopulation, self.n_elites)
-        if self.include_elites_in_tournament:
-            offspring += tools.selTournament(subpopulation, len(subpopulation) - self.n_elites, tournsize=2)
-        else:
-            # Get the remaining worse individuals
-            remaining_offspring = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites)
-            # Add those remaining individuals through a binary tournament
-            offspring += tools.selTournament(remaining_offspring, len(remaining_offspring), tournsize=2)
+        elites = tools.selBest(subpopulation, self.n_elites)
+        offspring = deepcopy(elites)
+
+        # Add the elites offspring to be mutated
+        offspring += [deepcopy(random.choice(elites)) for _ in range(self.n_elite_offspring)]
+
+        # Get the remaining worse individuals
+        remaining_offspring = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites - self.n_elite_offspring)
+        # Add those remaining individuals through a binary tournament
+        offspring += tools.selTournament(remaining_offspring, len(remaining_offspring), tournsize=2)
 
         # Return a deepcopy so that modifying an individual that was selected does not modify every single individual
         # that came from the same selected individual
@@ -471,7 +477,7 @@ class CooperativeCoevolutionaryAlgorithm:
             subpop[:] = subpop_offspring
 
     def createEvalFitnessCSV(self, trial_dir):
-        eval_fitness_dir = trial_dir / "fitness.csv"
+        eval_fitness_dir = f"{trial_dir}/fitness.csv"
         header = "generation,team_fitness_aggregated"
         for j in range(self.num_rovers):
             header += ",rover_" + str(j)
@@ -486,29 +492,25 @@ class CooperativeCoevolutionaryAlgorithm:
             file.write(header)
 
     def writeEvalFitnessCSV(self, trial_dir, eval_infos):
-        eval_fitness_dir = trial_dir / "fitness.csv"
+        eval_fitness_dir = f"{trial_dir}/fitness.csv"
         gen = str(self.gen)
 
         if len(eval_infos) == 1:
             eval_info = eval_infos[0]
             team_fit = str(eval_info.team_fitness)
-            agent_fits = [str(fit) for fit in eval_info.agent_fitnesses[1]]
+            agent_fits = [str(fit[1]) for fit in eval_info.agent_fitnesses]
             fit_list = [gen, team_fit] + agent_fits
             fit_str = ",".join(fit_list) + "\n"
 
         else:
-            team_eval_infos = []
-
-            for eval_info in eval_infos:
-                team_eval_infos.append(eval_info)
 
             # Aggergate the fitnesses into a big numpy array
-            num_ind_per_team = len(team_eval_infos[0].agent_fitnesses[1]) + 1  # +1 to include team fitness
+            num_ind_per_team = len(eval_infos[0].agent_fitnesses) + 1  # +1 to include team fitness
             all_fit = np.zeros(shape=(self.num_evaluations_per_team, num_ind_per_team))
 
-            for num_eval, eval_info in enumerate(team_eval_infos):
-                for num_ind, fit in enumerate(eval_info.agent_fitnesses[1]):
-                    all_fit[num_eval, num_ind] = fit
+            for num_eval, eval_info in enumerate(eval_infos):
+                for num_ind, fit in enumerate(eval_info.agent_fitnesses):
+                    all_fit[num_eval, num_ind] = fit[1]
                 all_fit[num_eval, -1] = eval_info.team_fitness
 
             # Now compute a sum/average/min/etc dependending on what config specifies
@@ -517,14 +519,14 @@ class CooperativeCoevolutionaryAlgorithm:
             # And now record it all, starting with the aggregated one
             agg_team_fit = str(agg_fit[-1])
             agg_agent_fits = [str(fit) for fit in agg_fit[:-1]]
-            fit_str = gen + "," + ",".join([agg_team_fit] + agg_agent_fits) + ","
+            fit_str = f"{gen},{','.join([agg_team_fit] + agg_agent_fits)},"
 
             # And now add all the fitnesses from individual trials
             # Each row should have the fitnesses for an evaluation
             for row in all_fit:
                 team_fit = str(row[-1])
                 agent_fits = [str(fit) for fit in row[:-1]]
-                fit_str += ",".join([team_fit] + agent_fits)
+                fit_str += f"{','.join([team_fit] + agent_fits)},"
             fit_str += "\n"
 
         # Now save it all to the csv
@@ -616,7 +618,7 @@ class CooperativeCoevolutionaryAlgorithm:
             self.gen = 0
 
             # Create directory for saving data
-            trial_dir = self.trials_dir / (f"trial_{str(num_trial)}_{self.trial_name}")
+            trial_dir = f"{self.trials_dir}/trial_{str(num_trial)}_{self.trial_name}"
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
 
@@ -639,9 +641,6 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Get loading bar up to checkpoint
                 if self.load_checkpoint and i <= self.gen:
                     continue
-
-                # Update gen counter
-                self.gen += 1
 
                 # Perform selection
                 offspring = self.select(pop)
@@ -668,22 +667,26 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Now populate the population with individuals from the offspring
                 self.setPopulation(pop, offspring)
 
+                # Save fitnesses
+                self.writeEvalFitnessCSV(trial_dir, eval_infos)
+
                 # Save trajectories and checkpoint
                 if self.gen % self.num_gens_between_save == 0:
 
                     if self.save_trajectories:
-                        # Save fitnesses
-                        self.writeEvalFitnessCSV(trial_dir, eval_infos)
                         # Save trajectories
                         self.writeEvalTrajs(trial_dir, eval_infos)
 
                     if self.save_checkpoint:
-                        with open(trial_dir / self.load_checkpoint_filename, "wb") as handle:
+                        with open(f"{trial_dir}/{self.load_checkpoint_filename}", "wb") as handle:
                             pickle.dump(
                                 {"population": pop, "last_gen": self.gen},
                                 handle,
                                 protocol=pickle.HIGHEST_PROTOCOL,
                             )
+
+                # Update gen counter
+                self.gen += 1
 
         if self.use_multiprocessing:
             self.pool.close()
