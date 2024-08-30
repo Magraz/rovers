@@ -44,37 +44,28 @@ env:
   pois:
     - type: static
       value: 8.0
-      observation_radius: 2.5
+      observation_radius: 4
       coupling: 2
       position:
         spawn_rule: fixed
         fixed: [15.0, 15.0]
 
     - type: static
-      value: 2.0  
-      observation_radius: 2.5
-      coupling: 2
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 10.0]
-
-    - type: static
       value: 4.0
-      observation_radius: 2.5
+      observation_radius: 4
       coupling: 2
       position:
         spawn_rule: fixed
         fixed: [35.0, 15.0]
 
   img_sensor_size: 25
-  team_size: 4
   map_size: [50.0, 50.0]
 
 teaming:
   use_teaming: True
   team_size: 4
 
-ccea: 
+ccea:
 
   weight_initialization: "kaiming"
 
@@ -84,38 +75,35 @@ ccea:
     rover_max_velocity: 1.0
 
   population:
-    subpopulation_size: 50
+    subpopulation_size: 40
 
   evaluation:
-    evaluation_method: HallOfFame
 
     multi_evaluation:
       num_evaluations: 3
       aggregation_method: average
-
-    hall_of_fame:
-      alpha: 0.5
     
     fitness_method: last_step #aggregate/last_step
 
-  selection:
-    selection_method: NElitesBinaryTournament
-    n_elites: 5
-    n_elite_offspring: 0.2
+  selection: 
+    n_elites: 0.20                       #Percentage of elites from subpopulation
+    n_extinction_candidates: 0.10        #Percentage of non-elite individuals to reset.
+    extinction_prob: 0.05                #Probability of resetting an extinction candidate
 
   mutation:
+    use_decay: False
     mean: 0.0
     min_std_deviation: 0.2
     max_std_deviation: 0.6
-    lifespan: 0.8 #The higher, the slower the decay, value from 0-1
+    lifespan: 0.25                  #The higher, the slower the decay, value from 0-1
     independent_probability: 0.5
 
   num_steps: 30
-  num_generations: 4000
+  num_generations: 5000
 
 processing:
   use_multiprocessing: True
-  num_threads: 10
+  num_threads: 8
 
 experiment:
   trial_name: multi_mlp_regular

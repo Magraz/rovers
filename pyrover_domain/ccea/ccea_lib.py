@@ -96,23 +96,28 @@ class CooperativeCoevolutionaryAlgorithm:
         self.sensor_type = self.config["env"]["rovers"][0]["sensor_type"]
         self.image_size = self.config["env"]["img_sensor_size"]
 
-        self.num_pois = len(self.config["env"]["pois"])
+        self.n_pois = len(self.config["env"]["pois"])
 
-        self.n_elites = self.config["ccea"]["selection"]["n_elites"]
-        self.num_mutants = self.subpopulation_size - self.n_elites
-        self.n_elite_offspring = round(self.config["ccea"]["selection"]["n_elite_offspring"] * self.num_mutants)
+        self.n_elites = round(self.config["ccea"]["selection"]["n_elites"] * self.subpopulation_size)
+        self.n_mutants = self.subpopulation_size - self.n_elites
+        self.n_extinction_candidates = round(
+            self.config["ccea"]["selection"]["n_extinction_candidates"] * self.n_mutants
+        )
+
+        self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
 
         if self.use_teaming:
-            self.num_evaluations_per_team = len(self.team_combinations)
+            self.n_eval_per_team_combos = len(self.team_combinations) * self.n_eval_per_team
         else:
-            self.num_evaluations_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
+            self.n_eval_per_team_combos = self.n_eval_per_team
 
         self.aggregation_method = self.config["ccea"]["evaluation"]["multi_evaluation"]["aggregation_method"]
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
 
-        self.num_steps = self.config["ccea"]["num_steps"]
+        self.n_steps = self.config["ccea"]["num_steps"]
+        self.n_gens = self.config["ccea"]["num_generations"]
 
-        self.num_rover_sectors = int(360 / self.config["env"]["rovers"][0]["resolution"])
+        self.n_rover_sectors = int(360 / self.config["env"]["rovers"][0]["resolution"])
         self.rover_nn_template = self.generateTemplateNN()
         self.rover_nn_size = self.rover_nn_template.num_params
 
@@ -183,7 +188,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             case "GRU":
                 agent_nn = GRU_Policy(
-                    input_size=2 * self.num_rover_sectors,
+                    input_size=2 * self.n_rover_sectors,
                     hidden_size=self.num_hidden[0],
                     output_size=2,
                     num_layers=1,
@@ -196,7 +201,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             case "MLP":
                 agent_nn = MLP_Policy(
-                    input_size=2 * self.num_rover_sectors,
+                    input_size=2 * self.n_rover_sectors,
                     hidden_layers=len(self.num_hidden),
                     hidden_size=self.num_hidden[0],
                     output_size=2,
@@ -240,12 +245,14 @@ class CooperativeCoevolutionaryAlgorithm:
 
             if self.use_teaming:
                 # Put the i'th individual on the team if it is inside our team combinations
-                teams.extend(
-                    [
-                        Team(idx=i, individuals=[agents[idx] for idx in combination], combination=combination)
-                        for combination in self.team_combinations
-                    ]
-                )
+                for combination in self.team_combinations:
+
+                    teams.extend(
+                        [
+                            Team(idx=i, individuals=[agents[idx] for idx in combination], combination=combination)
+                            for _ in range(self.n_eval_per_team)
+                        ]
+                    )
 
             else:
                 team = Team(idx=i)
@@ -255,7 +262,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # Need to save that team for however many evaluations
                 # we're doing per team
-                teams.extend([team for _ in range(self.num_evaluations_per_team)])
+                teams.extend([team for _ in range(self.n_eval_per_team)])
 
         return teams
 
@@ -306,14 +313,14 @@ class CooperativeCoevolutionaryAlgorithm:
         G_list = []
 
         # Start evaluation
-        for _ in range(self.num_steps):
+        for _ in range(self.n_steps):
 
             # Compute the actions of all rovers
             observation_arrs = []
             actions_arrs = []
             actions = []
 
-            for ind, (observation, agent_nn) in enumerate(zip(observations, agent_nns)):
+            for _, (observation, agent_nn) in enumerate(zip(observations, agent_nns)):
 
                 obs_tensor = observation.data()
 
@@ -321,7 +328,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 match (self.sensor_type):
 
                     case "lidar":
-                        obs_tensor.reshape((self.num_rover_sectors * 2,))  # State space is 8 dimensional
+                        obs_tensor.reshape((self.n_rover_sectors * 2,))  # State space is 8 dimensional
                         obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=8)
 
                     case "camera":
@@ -339,8 +346,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 action_arr = action.squeeze().cpu().detach().numpy()
 
                 # Multiply by agent velocity
-                if ind <= self.num_rovers:
-                    action_arr *= self.config["ccea"]["model"]["rover_max_velocity"]
+                action_arr *= self.config["ccea"]["model"]["rover_max_velocity"]
 
                 # Save this info for debugging purposes
                 observation_arrs.append(observation_arr)
@@ -393,39 +399,68 @@ class CooperativeCoevolutionaryAlgorithm:
         )
 
     def mutateIndividual(self, individual):
-        mutation_lifespan = self.config["ccea"]["num_generations"] * self.config["ccea"]["mutation"]["lifespan"]
 
-        decay_rate = -np.log(self.config["ccea"]["mutation"]["min_std_deviation"]) / mutation_lifespan
+        min_stdev = self.config["ccea"]["mutation"]["min_std_deviation"]
+        max_stdev = self.config["ccea"]["mutation"]["max_std_deviation"]
+        mut_lifespan = self.config["ccea"]["mutation"]["lifespan"]
+        use_decay = self.config["ccea"]["mutation"]["use_decay"]
+        mu = self.config["ccea"]["mutation"]["mean"]
+        indpb = self.config["ccea"]["mutation"]["independent_probability"]
 
-        mutation_stdev = self.config["ccea"]["mutation"]["max_std_deviation"] * np.power((1 - decay_rate), self.gen)
+        if use_decay:
+            mutation_lifespan = int(self.n_gens * mut_lifespan)
+
+            decay_rate = np.log(min_stdev / max_stdev) / mutation_lifespan
+
+            mutation_stdev = max_stdev * np.exp(decay_rate * self.gen)
+
+            if mutation_stdev < min_stdev:
+                mutation_stdev = min_stdev
+
+        else:
+            mutation_stdev = min_stdev
 
         return tools.mutGaussian(
             individual,
-            mu=self.config["ccea"]["mutation"]["mean"],
+            mu=mu,
             sigma=mutation_stdev,
-            indpb=self.config["ccea"]["mutation"]["independent_probability"],
+            indpb=indpb,
         )
 
     def mutate(self, population):
-        # Don't mutate the elites from n-elites
-        for num_individual in range(self.num_mutants):
-            mutant_id = num_individual + self.n_elites
+        # Don't mutate the elites
+        for num_individual in range(self.n_mutants):
+
+            mutant_idx = num_individual + self.n_elites
+
             for subpop in population:
-                self.mutateIndividual(subpop[mutant_id])
-                subpop[mutant_id].fitness.values = (np.float64(0.0),)
+                self.mutateIndividual(subpop[mutant_idx])
+                subpop[mutant_idx].fitness.values = (np.float64(0.0),)
 
     def selectSubPopulation(self, subpopulation):
         # Get the best N individuals
         elites = tools.selBest(subpopulation, self.n_elites)
-        offspring = deepcopy(elites)
-
-        # Add the elites offspring to be mutated
-        offspring += [deepcopy(random.choice(elites)) for _ in range(self.n_elite_offspring)]
 
         # Get the remaining worse individuals
-        remaining_offspring = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites - self.n_elite_offspring)
-        # Add those remaining individuals through a binary tournament
-        offspring += tools.selTournament(remaining_offspring, len(remaining_offspring), tournsize=2)
+        non_elites = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites)
+
+        # Select extinction candidates
+        extinction_candidates = tools.selWorst(non_elites, self.n_extinction_candidates)
+
+        # Reinitialize extinction candidates
+        ext_prob = self.config["ccea"]["selection"]["extinction_prob"]
+        for idx, _ in enumerate(extinction_candidates):
+            if np.random.choice(
+                [True, False],
+                1,
+                p=[
+                    ext_prob,
+                    1 - ext_prob,
+                ],
+            ):
+                non_elites[idx] = self.createIndividual()
+
+        offspring = elites + non_elites
 
         # Return a deepcopy so that modifying an individual that was selected does not modify every single individual
         # that came from the same selected individual
@@ -448,17 +483,17 @@ class CooperativeCoevolutionaryAlgorithm:
         # There may be several eval_infos for the same team
         # This is the case if there are many evaluations per team
         # In that case, we need to aggregate those many evaluations into one fitness
-        if self.num_evaluations_per_team == 1:
+        if self.n_eval_per_team_combos == 1:
             for team, eval_info in zip(teams, eval_infos):
                 for individual, fit in zip(team.individuals, eval_info.agent_fitnesses[1]):
                     individual.parameters.fitness.values = fit
         else:
 
-            for team_id, team in enumerate(teams[:: self.num_evaluations_per_team]):
+            for team_id, team in enumerate(teams[:: self.n_eval_per_team_combos]):
 
                 # Get all the eval infos for this team
                 team_eval_infos = eval_infos[
-                    team_id * self.num_evaluations_per_team : (team_id + 1) * self.num_evaluations_per_team
+                    team_id * self.n_eval_per_team_combos : (team_id + 1) * self.n_eval_per_team_combos
                 ]
 
                 # Aggregate the fitnesses into a big numpy array
@@ -482,7 +517,7 @@ class CooperativeCoevolutionaryAlgorithm:
         for j in range(self.num_rovers):
             header += ",rover_" + str(j)
 
-        for i in range(self.num_evaluations_per_team):
+        for i in range(self.n_eval_per_team_combos):
             header += ",team_fitness_" + str(i)
             for j in range(self.num_rovers):
                 header += ",team_" + str(i) + "_rover_" + str(j)
@@ -506,7 +541,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             # Aggergate the fitnesses into a big numpy array
             num_ind_per_team = len(eval_infos[0].agent_fitnesses) + 1  # +1 to include team fitness
-            all_fit = np.zeros(shape=(self.num_evaluations_per_team, num_ind_per_team))
+            all_fit = np.zeros(shape=(self.n_eval_per_team_combos, num_ind_per_team))
 
             for num_eval, eval_info in enumerate(eval_infos):
                 for num_ind, fit in enumerate(eval_info.agent_fitnesses):
@@ -556,12 +591,12 @@ class CooperativeCoevolutionaryAlgorithm:
                 for i in range(self.team_size):
                     header += f"rover_{i}_x,rover_{i}_y,"
 
-                for i in range(self.num_pois):
+                for i in range(self.n_pois):
                     header += f"rover_poi_{i}_x,rover_poi_{i}_y,"
 
                 # Observations
                 for i in range(self.team_size):
-                    for j in range(self.num_rover_sectors * 2):
+                    for j in range(self.n_rover_sectors * 2):
                         header += f"rover_{i}_obs_{i},"
 
                 # Actions
@@ -613,22 +648,26 @@ class CooperativeCoevolutionaryAlgorithm:
                     file.write(csv_line)
 
     def run(self):
-        for num_trial in range(self.config["experiment"]["num_trials"]):
-            # Init gen counter
-            self.gen = 0
+        # Load checkpoint
+        if self.load_checkpoint:
+            with open(trial_dir / self.load_checkpoint_filename, "rb") as handle:
+                checkpoint = pickle.load(handle)
+                pop = checkpoint["population"]
+                self.checkpoint_gen = checkpoint["gen"]
+                self.checkpoint_trial = checkpoint["trial"]
+            logging.info(f"Loading GEN:{self.checkpoint_gen} TRIAL: {self.checkpoint_trial}...")
+        else:
+            logging.info(f"Starting run...")
+
+        for n_trial in range(self.config["experiment"]["num_trials"]):
 
             # Create directory for saving data
-            trial_dir = f"{self.trials_dir}/trial_{str(num_trial)}_{self.trial_name}"
+            trial_dir = f"{self.trials_dir}/trial_{str(n_trial)}_{self.trial_name}"
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
-
             # Initialize the population or load models
-            if self.load_checkpoint:
-
-                with open(trial_dir / self.load_checkpoint_filename, "rb") as handle:
-                    checkpoint = pickle.load(handle)
-                    pop = checkpoint["population"]
-                    self.gen = checkpoint["last_gen"]
+            if self.load_checkpoint and n_trial <= self.checkpoint_trial:
+                continue
 
             else:
                 pop = self.toolbox.population()
@@ -636,10 +675,13 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Create csv file for saving evaluation fitnesses
                 self.createEvalFitnessCSV(trial_dir)
 
-            for i in tqdm(range(self.config["ccea"]["num_generations"])):
+            for n_gen in tqdm(range(self.n_gens + 1)):
+
+                # Set gen counter global var
+                self.gen = n_gen
 
                 # Get loading bar up to checkpoint
-                if self.load_checkpoint and i <= self.gen:
+                if self.load_checkpoint and n_gen <= self.checkpoint_gen:
                     continue
 
                 # Perform selection
@@ -671,23 +713,20 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.writeEvalFitnessCSV(trial_dir, eval_infos)
 
                 # Save trajectories and checkpoint
-                if self.gen % self.num_gens_between_save == 0:
+                if n_gen % self.num_gens_between_save == 0:
 
                     if self.save_trajectories:
                         # Save trajectories
                         self.writeEvalTrajs(trial_dir, eval_infos)
 
                     if self.save_checkpoint:
+                        trial_done = 1 if n_gen == self.n_gens else 0
                         with open(f"{trial_dir}/{self.load_checkpoint_filename}", "wb") as handle:
                             pickle.dump(
-                                {"population": pop, "last_gen": self.gen},
+                                {"population": pop, "gen": n_gen, "trial": n_trial + trial_done},
                                 handle,
                                 protocol=pickle.HIGHEST_PROTOCOL,
                             )
-
-                # Update gen counter
-                self.gen += 1
-
         if self.use_multiprocessing:
             self.pool.close()
 
