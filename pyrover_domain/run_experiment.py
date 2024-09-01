@@ -23,7 +23,7 @@ if __name__ == "__main__":
         config_dir = "/nfs/hpc/share/agrazvam/experiments/yamls"
 
     # Set configuration file
-    config_dir = f"{config_dir}/multi_agent_regular_mlp.yaml"
+    config_dir = f"{config_dir}/multi_agent_regular_mlp_teaming.yaml"
     # config_dir = "/home/magraz/rovers/pyrover_domain/config/single_agent_decay.yaml"
     # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_mlp.yaml"
     # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_cnn.yaml"

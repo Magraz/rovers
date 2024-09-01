@@ -87,15 +87,13 @@ class CooperativeCoevolutionaryAlgorithm:
         self.use_teaming = self.config["teaming"]["use_teaming"]
 
         self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
-
-        if self.use_teaming:
-            self.n_eval_per_team_set = len(self.team_combinations) * self.n_eval_per_team
-            self.team_size = self.config["teaming"]["team_size"]
-        else:
-            self.n_eval_per_team_set = self.n_eval_per_team
-            self.team_size = self.num_rovers
-
+        self.team_size = self.config["teaming"]["team_size"] if self.use_teaming else self.num_rovers
         self.team_combinations = [combo for combo in combinations(range(self.num_rovers), self.team_size)]
+
+        self.n_eval_per_team_set = (
+            len(self.team_combinations) * self.n_eval_per_team if self.use_teaming else self.n_eval_per_team
+        )
+
         self.subpopulation_size = self.config["ccea"]["population"]["subpopulation_size"]
 
         self.num_hidden = self.config["ccea"]["model"]["hidden_layers"]
