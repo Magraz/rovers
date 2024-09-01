@@ -85,7 +85,16 @@ class CooperativeCoevolutionaryAlgorithm:
         # Start by setting up variables for different agents
         self.num_rovers = len(self.config["env"]["rovers"])
         self.use_teaming = self.config["teaming"]["use_teaming"]
-        self.team_size = self.config["teaming"]["team_size"]
+
+        self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
+
+        if self.use_teaming:
+            self.n_eval_per_team_set = len(self.team_combinations) * self.n_eval_per_team
+            self.team_size = self.config["teaming"]["team_size"]
+        else:
+            self.n_eval_per_team_set = self.n_eval_per_team
+            self.team_size = self.num_rovers
+
         self.team_combinations = [combo for combo in combinations(range(self.num_rovers), self.team_size)]
         self.subpopulation_size = self.config["ccea"]["population"]["subpopulation_size"]
 
@@ -103,13 +112,6 @@ class CooperativeCoevolutionaryAlgorithm:
         self.n_extinction_candidates = round(
             self.config["ccea"]["selection"]["n_extinction_candidates"] * self.n_mutants
         )
-
-        self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
-
-        if self.use_teaming:
-            self.n_eval_per_team_combos = len(self.team_combinations) * self.n_eval_per_team
-        else:
-            self.n_eval_per_team_combos = self.n_eval_per_team
 
         self.aggregation_method = self.config["ccea"]["evaluation"]["multi_evaluation"]["aggregation_method"]
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
@@ -214,8 +216,8 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Get best agents
         for idx, subpop in enumerate(population):
-            # Use max with a key function to get the individual with the highest fitness[0] value
-            best_ind = max(subpop, key=lambda ind: ind.fitness.values[0] if (len(ind.fitness.values) > 0) else 0.0)
+            # Get the best N individuals
+            best_ind = tools.selBest(subpop, 1)[0]
             best_agents.append(Agent(idx=idx, parameters=best_ind))
 
         return best_agents
@@ -257,7 +259,7 @@ class CooperativeCoevolutionaryAlgorithm:
             else:
                 team = Team(idx=i)
 
-                team.individuals = [agent for agent in agents]
+                team.individuals = agents
                 team.combination = [agent.idx for agent in agents]
 
                 # Need to save that team for however many evaluations
@@ -318,7 +320,6 @@ class CooperativeCoevolutionaryAlgorithm:
             # Compute the actions of all rovers
             observation_arrs = []
             actions_arrs = []
-            actions = []
 
             for _, (observation, agent_nn) in enumerate(zip(observations, agent_nns)):
 
@@ -352,9 +353,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 observation_arrs.append(observation_arr)
                 actions_arrs.append(action_arr)
 
-            for action_arr in actions_arrs:
-                action = rovers.tensor(action_arr)
-                actions.append(action)
+            actions = [rovers.tensor(action_arr) for action_arr in actions_arrs]
 
             observations, rewards = env.step(actions)
 
@@ -442,23 +441,26 @@ class CooperativeCoevolutionaryAlgorithm:
         elites = tools.selBest(subpopulation, self.n_elites)
 
         # Get the remaining worse individuals
-        non_elites = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites)
+        # non_elites = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites)
 
-        # Select extinction candidates
-        extinction_candidates = tools.selWorst(non_elites, self.n_extinction_candidates)
+        # if self.config["ccea"]["selection"]["use_extinction"]:
+        #     # Select extinction candidates
+        #     extinction_candidates = tools.selWorst(non_elites, self.n_extinction_candidates)
 
-        # Reinitialize extinction candidates
-        ext_prob = self.config["ccea"]["selection"]["extinction_prob"]
-        for idx, _ in enumerate(extinction_candidates):
-            if np.random.choice(
-                [True, False],
-                1,
-                p=[
-                    ext_prob,
-                    1 - ext_prob,
-                ],
-            ):
-                non_elites[idx] = self.createIndividual()
+        #     # Reinitialize extinction candidates
+        #     ext_prob = self.config["ccea"]["selection"]["extinction_prob"]
+        #     for idx, _ in enumerate(extinction_candidates):
+        #         if np.random.choice(
+        #             [True, False],
+        #             1,
+        #             p=[
+        #                 ext_prob,
+        #                 1 - ext_prob,
+        #             ],
+        #         ):
+        #             non_elites[idx] = self.createIndividual()
+
+        non_elites = tools.selTournament(subpopulation, len(subpopulation) - self.n_elites, tournsize=2)
 
         offspring = elites + non_elites
 
@@ -483,17 +485,17 @@ class CooperativeCoevolutionaryAlgorithm:
         # There may be several eval_infos for the same team
         # This is the case if there are many evaluations per team
         # In that case, we need to aggregate those many evaluations into one fitness
-        if self.n_eval_per_team_combos == 1:
+        if self.n_eval_per_team_set == 1:
             for team, eval_info in zip(teams, eval_infos):
                 for individual, fit in zip(team.individuals, eval_info.agent_fitnesses[1]):
                     individual.parameters.fitness.values = fit
         else:
 
-            for team_id, team in enumerate(teams[:: self.n_eval_per_team_combos]):
+            for team_id, team in enumerate(teams[:: self.n_eval_per_team_set]):
 
                 # Get all the eval infos for this team
                 team_eval_infos = eval_infos[
-                    team_id * self.n_eval_per_team_combos : (team_id + 1) * self.n_eval_per_team_combos
+                    team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set
                 ]
 
                 # Aggregate the fitnesses into a big numpy array
@@ -517,7 +519,7 @@ class CooperativeCoevolutionaryAlgorithm:
         for j in range(self.num_rovers):
             header += ",rover_" + str(j)
 
-        for i in range(self.n_eval_per_team_combos):
+        for i in range(self.n_eval_per_team_set):
             header += ",team_fitness_" + str(i)
             for j in range(self.num_rovers):
                 header += ",team_" + str(i) + "_rover_" + str(j)
@@ -541,7 +543,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
             # Aggergate the fitnesses into a big numpy array
             num_ind_per_team = len(eval_infos[0].agent_fitnesses) + 1  # +1 to include team fitness
-            all_fit = np.zeros(shape=(self.n_eval_per_team_combos, num_ind_per_team))
+            all_fit = np.zeros(shape=(self.n_eval_per_team_set, num_ind_per_team))
 
             for num_eval, eval_info in enumerate(eval_infos):
                 for num_ind, fit in enumerate(eval_info.agent_fitnesses):
@@ -549,7 +551,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 all_fit[num_eval, -1] = eval_info.team_fitness
 
             # Now compute a sum/average/min/etc dependending on what config specifies
-            agg_fit = np.average(all_fit, axis=0)
+            agg_fit = np.sum(all_fit, axis=0)
 
             # And now record it all, starting with the aggregated one
             agg_team_fit = str(agg_fit[-1])
@@ -665,10 +667,10 @@ class CooperativeCoevolutionaryAlgorithm:
             trial_dir = f"{self.trials_dir}/trial_{str(n_trial)}_{self.trial_name}"
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
+
             # Initialize the population or load models
             if self.load_checkpoint and n_trial <= self.checkpoint_trial:
                 continue
-
             else:
                 pop = self.toolbox.population()
 

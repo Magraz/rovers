@@ -32,6 +32,14 @@ env:
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
 
   pois:
     - type: static
@@ -54,7 +62,7 @@ env:
   map_size: [50.0, 50.0]
 
 teaming:
-  use_teaming: False
+  use_teaming: True
   team_size: 4
 
 ccea:
@@ -63,7 +71,7 @@ ccea:
 
   model:
     type: MLP
-    hidden_layers: [32]
+    hidden_layers: [64, 64]
     rover_max_velocity: 1.0
 
   population:
@@ -99,7 +107,7 @@ processing:
   num_threads: 8
 
 experiment:
-  trial_name: multi_mlp_regular
+  trial_name: multi_mlp_regular_teaming
   num_trials: 3
   
 data:
