@@ -191,7 +191,7 @@ class CooperativeCoevolutionaryAlgorithm:
                     input_size=2 * self.n_rover_sectors,
                     hidden_size=self.num_hidden[0],
                     output_size=2,
-                    num_layers=1,
+                    n_layers=1,
                 ).to(DEVICE)
 
             case "CNN":
@@ -397,32 +397,11 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def mutateIndividual(self, individual):
 
-        min_stdev = self.config["ccea"]["mutation"]["min_std_deviation"]
-        max_stdev = self.config["ccea"]["mutation"]["max_std_deviation"]
-        mut_lifespan = self.config["ccea"]["mutation"]["lifespan"]
-        use_decay = self.config["ccea"]["mutation"]["use_decay"]
+        stdev = self.config["ccea"]["mutation"]["std_deviation"]
         mu = self.config["ccea"]["mutation"]["mean"]
         indpb = self.config["ccea"]["mutation"]["independent_probability"]
 
-        if use_decay:
-            mutation_lifespan = int(self.n_gens * mut_lifespan)
-
-            decay_rate = np.log(min_stdev / max_stdev) / mutation_lifespan
-
-            mutation_stdev = max_stdev * np.exp(decay_rate * self.gen)
-
-            if mutation_stdev < min_stdev:
-                mutation_stdev = min_stdev
-
-        else:
-            mutation_stdev = min_stdev
-
-        return tools.mutGaussian(
-            individual,
-            mu=mu,
-            sigma=mutation_stdev,
-            indpb=indpb,
-        )
+        individual *= np.random.normal(loc=mu, scale=stdev, size=np.shape(individual))
 
     def mutate(self, population):
         # Don't mutate the elites
@@ -549,7 +528,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 all_fit[num_eval, -1] = eval_info.team_fitness
 
             # Now compute a sum/average/min/etc dependending on what config specifies
-            agg_fit = np.sum(all_fit, axis=0)
+            agg_fit = np.average(all_fit, axis=0)
 
             # And now record it all, starting with the aggregated one
             agg_team_fit = str(agg_fit[-1])

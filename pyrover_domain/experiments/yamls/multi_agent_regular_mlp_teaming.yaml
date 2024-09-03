@@ -80,7 +80,7 @@ ccea:
   evaluation:
 
     multi_evaluation:
-      num_evaluations: 3
+      num_evaluations: 1
       aggregation_method: average
     
     fitness_method: last_step #aggregate/last_step
@@ -92,15 +92,12 @@ ccea:
     extinction_prob: 0.001                #Probability of resetting an extinction candidate
 
   mutation:
-    mean: 0.0
+    mean: 1.0
     independent_probability: 0.5
-    use_decay: False
-    min_std_deviation: 0.2
-    max_std_deviation: 0.6
-    lifespan: 0.25                  #The higher, the slower the decay, value from 0-1
+    std_deviation: 0.05
 
   num_steps: 30
-  num_generations: 4000
+  num_generations: 6000
 
 processing:
   use_multiprocessing: True

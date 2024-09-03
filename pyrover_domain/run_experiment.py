@@ -22,12 +22,13 @@ if __name__ == "__main__":
     if args.hpc:
         config_dir = "/nfs/hpc/share/agrazvam/experiments/yamls"
 
+    model = "mlp"  # mlp/cnn/gru
+    modality = "multi"  # single/multi
+    poi_type = "regular"  # regular/decay
+    formations = "teaming"  # teaming/''
+
     # Set configuration file
-    config_dir = f"{config_dir}/multi_agent_regular_mlp_teaming.yaml"
-    # config_dir = "/home/magraz/rovers/pyrover_domain/config/single_agent_decay.yaml"
-    # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_mlp.yaml"
-    # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_cnn.yaml"
-    # config_dir = "/home/magraz/rovers/pyrover_domain/config/multi_agent_decay_gru.yaml"
+    config_dir = f"{config_dir}/{modality}_agent_{poi_type}_{model}_{formations}.yaml"
 
     # Run learning algorithm
     runCCEA(config_dir=config_dir)
