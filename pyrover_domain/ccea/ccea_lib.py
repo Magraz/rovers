@@ -243,26 +243,15 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Get agents in this row of subpopulations
                 agents = [Agent(idx=idx, parameters=subpop[i]) for idx, subpop in enumerate(population)]
 
-            if self.use_teaming:
-                # Put the i'th individual on the team if it is inside our team combinations
-                for combination in self.team_combinations:
+            # Put the i'th individual on the team if it is inside our team combinations
+            for combination in self.team_combinations:
 
-                    teams.extend(
-                        [
-                            Team(idx=i, individuals=[agents[idx] for idx in combination], combination=combination)
-                            for _ in range(self.n_eval_per_team)
-                        ]
-                    )
-
-            else:
-                team = Team(idx=i)
-
-                team.individuals = agents
-                team.combination = [agent.idx for agent in agents]
-
-                # Need to save that team for however many evaluations
-                # we're doing per team
-                teams.extend([team for _ in range(self.n_eval_per_team)])
+                teams.extend(
+                    [
+                        Team(idx=i, individuals=[agents[idx] for idx in combination], combination=combination)
+                        for _ in range(self.n_eval_per_team)
+                    ]
+                )
 
         return teams
 
@@ -462,29 +451,29 @@ class CooperativeCoevolutionaryAlgorithm:
         # There may be several eval_infos for the same team
         # This is the case if there are many evaluations per team
         # In that case, we need to aggregate those many evaluations into one fitness
-        if self.n_eval_per_team_set == 1:
-            for team, eval_info in zip(teams, eval_infos):
-                for individual, fit in zip(team.individuals, eval_info.agent_fitnesses[1]):
-                    individual.parameters.fitness.values = fit
-        else:
+        for team_id, team in enumerate(teams[:: self.n_eval_per_team_set]):
 
-            for team_id, team in enumerate(teams[:: self.n_eval_per_team_set]):
+            # Get all the eval infos for this team
+            team_eval_infos = eval_infos[team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set]
+            teams_in_set = teams[team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set]
 
-                # Get all the eval infos for this team
-                team_eval_infos = eval_infos[
-                    team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set
-                ]
+            # Aggregate the fitnesses into a big numpy array
+            accumulated_fitnesses = [0 for _ in range(self.num_rovers)]
 
-                # Aggregate the fitnesses into a big numpy array
-                accumulated_fitnesses = [0 for _ in range(self.num_rovers)]
+            for eval_info in team_eval_infos:
+                for idx, fit in eval_info.agent_fitnesses:
+                    accumulated_fitnesses[idx] += fit
 
-                for eval_info in team_eval_infos:
-                    for idx, fit in eval_info.agent_fitnesses:
-                        accumulated_fitnesses[idx] += fit
+            # Group all individuals in teams within this set
+            individuals_in_set = {}
 
-                # Put into tuples due to deap.base.Fitness type
+            for team in teams_in_set:
                 for idx, individual in zip(team.combination, team.individuals):
-                    individual.parameters.fitness.values = (accumulated_fitnesses[idx],)
+                    individuals_in_set[idx] = individual
+
+            # Put into tuples due to deap.base.Fitness type
+            for idx, individual in individuals_in_set.items():
+                individual.parameters.fitness.values = (accumulated_fitnesses[idx],)
 
     def setPopulation(self, population, offspring):
         for subpop, subpop_offspring in zip(population, offspring):
@@ -498,7 +487,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         for i in range(self.n_eval_per_team_set):
             header += ",team_fitness_" + str(i)
-            for j in range(self.num_rovers):
+            for j in range(self.team_size):
                 header += ",team_" + str(i) + "_rover_" + str(j)
 
         header += "\n"
@@ -509,39 +498,30 @@ class CooperativeCoevolutionaryAlgorithm:
         eval_fitness_dir = f"{trial_dir}/fitness.csv"
         gen = str(self.gen)
 
-        if len(eval_infos) == 1:
-            eval_info = eval_infos[0]
-            team_fit = str(eval_info.team_fitness)
-            agent_fits = [str(fit[1]) for fit in eval_info.agent_fitnesses]
-            fit_list = [gen, team_fit] + agent_fits
-            fit_str = ",".join(fit_list) + "\n"
+        # Aggergate the fitnesses into a big numpy array
+        num_ind_per_team = self.num_rovers + 1  # +1 to include team fitness
+        all_fit = np.zeros(shape=(self.n_eval_per_team_set, num_ind_per_team))
 
-        else:
+        for num_eval, eval_info in enumerate(eval_infos):
+            for fit in eval_info.agent_fitnesses:
+                all_fit[num_eval, fit[0]] = fit[1]
+            all_fit[num_eval, -1] = eval_info.team_fitness
 
-            # Aggergate the fitnesses into a big numpy array
-            num_ind_per_team = len(eval_infos[0].agent_fitnesses) + 1  # +1 to include team fitness
-            all_fit = np.zeros(shape=(self.n_eval_per_team_set, num_ind_per_team))
+        # Now compute a sum/average/min/etc dependending on what config specifies
+        agg_fit = np.average(all_fit, axis=0)
 
-            for num_eval, eval_info in enumerate(eval_infos):
-                for num_ind, fit in enumerate(eval_info.agent_fitnesses):
-                    all_fit[num_eval, num_ind] = fit[1]
-                all_fit[num_eval, -1] = eval_info.team_fitness
+        # And now record it all, starting with the aggregated one
+        agg_team_fit = str(agg_fit[-1])
+        agg_agent_fits = [str(fit) for fit in agg_fit[:-1]]
+        fit_str = f"{gen},{','.join([agg_team_fit] + agg_agent_fits)},"
 
-            # Now compute a sum/average/min/etc dependending on what config specifies
-            agg_fit = np.average(all_fit, axis=0)
-
-            # And now record it all, starting with the aggregated one
-            agg_team_fit = str(agg_fit[-1])
-            agg_agent_fits = [str(fit) for fit in agg_fit[:-1]]
-            fit_str = f"{gen},{','.join([agg_team_fit] + agg_agent_fits)},"
-
-            # And now add all the fitnesses from individual trials
-            # Each row should have the fitnesses for an evaluation
-            for row in all_fit:
-                team_fit = str(row[-1])
-                agent_fits = [str(fit) for fit in row[:-1]]
-                fit_str += f"{','.join([team_fit] + agent_fits)},"
-            fit_str += "\n"
+        # And now add all the fitnesses from individual trials
+        # Each row should have the fitnesses for an evaluation
+        for row, eval_info in zip(all_fit, eval_infos):
+            team_fit = str(row[-1])
+            agent_fits = [str(row[idx]) for idx in eval_info.team_formation]
+            fit_str += f"{','.join([team_fit] + agent_fits)},"
+        fit_str += "\n"
 
         # Now save it all to the csv
         with open(eval_fitness_dir, "a") as file:
