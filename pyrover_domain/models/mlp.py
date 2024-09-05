@@ -44,7 +44,11 @@ if __name__ == "__main__":
 
     model = MLP_Policy(input_size=8, hidden_layers=2, hidden_size=64, output_size=2).to(device)
     model_copy = deepcopy(model)
+
+    torch.set_printoptions(threshold=10_000)
     print(model_copy.num_params)
+
+    print(model_copy.get_params())
 
     input = torch.tensor([-1, -1, -1, -1, -1, -1, -1, -1], dtype=torch.float).to(device)
     print(model_copy.forward(input))

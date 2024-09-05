@@ -16,7 +16,7 @@ class DecayPOI(rovers.IPOI):
         constraintPolicy: rovers.IConstraint,
         lifespan: int,
         decay_start: float = 0,
-        decay_value: bool = True,
+        decay_value: bool = False,
         decay_type: str = "exp",
     ):
         super().__init__(value, obs_radius)

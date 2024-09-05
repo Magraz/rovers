@@ -107,9 +107,6 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.n_elites = round(self.config["ccea"]["selection"]["n_elites"] * self.subpopulation_size)
         self.n_mutants = self.subpopulation_size - self.n_elites
-        self.n_extinction_candidates = round(
-            self.config["ccea"]["selection"]["n_extinction_candidates"] * self.n_mutants
-        )
 
         self.aggregation_method = self.config["ccea"]["evaluation"]["multi_evaluation"]["aggregation_method"]
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
@@ -388,7 +385,6 @@ class CooperativeCoevolutionaryAlgorithm:
 
         stdev = self.config["ccea"]["mutation"]["std_deviation"]
         mu = self.config["ccea"]["mutation"]["mean"]
-        indpb = self.config["ccea"]["mutation"]["independent_probability"]
 
         individual *= np.random.normal(loc=mu, scale=stdev, size=np.shape(individual))
 
@@ -405,26 +401,6 @@ class CooperativeCoevolutionaryAlgorithm:
     def selectSubPopulation(self, subpopulation):
         # Get the best N individuals
         elites = tools.selBest(subpopulation, self.n_elites)
-
-        # Get the remaining worse individuals
-        # non_elites = tools.selWorst(subpopulation, len(subpopulation) - self.n_elites)
-
-        # if self.config["ccea"]["selection"]["use_extinction"]:
-        #     # Select extinction candidates
-        #     extinction_candidates = tools.selWorst(non_elites, self.n_extinction_candidates)
-
-        #     # Reinitialize extinction candidates
-        #     ext_prob = self.config["ccea"]["selection"]["extinction_prob"]
-        #     for idx, _ in enumerate(extinction_candidates):
-        #         if np.random.choice(
-        #             [True, False],
-        #             1,
-        #             p=[
-        #                 ext_prob,
-        #                 1 - ext_prob,
-        #             ],
-        #         ):
-        #             non_elites[idx] = self.createIndividual()
 
         non_elites = tools.selTournament(subpopulation, len(subpopulation) - self.n_elites, tournsize=2)
 
@@ -607,26 +583,29 @@ class CooperativeCoevolutionaryAlgorithm:
                     file.write(csv_line)
 
     def run(self):
-        # Load checkpoint
-        if self.load_checkpoint:
-            with open(trial_dir / self.load_checkpoint_filename, "rb") as handle:
-                checkpoint = pickle.load(handle)
-                pop = checkpoint["population"]
-                self.checkpoint_gen = checkpoint["gen"]
-                self.checkpoint_trial = checkpoint["trial"]
-            logging.info(f"Loading GEN:{self.checkpoint_gen} TRIAL: {self.checkpoint_trial}...")
-        else:
-            logging.info(f"Starting run...")
 
         for n_trial in range(self.config["experiment"]["num_trials"]):
 
-            # Create directory for saving data
+            # Set trial directory name
             trial_dir = f"{self.trials_dir}/trial_{str(n_trial)}_{self.trial_name}"
+
+            # Load checkpoint
+            if self.load_checkpoint:
+                with open(f"{trial_dir}/{self.load_checkpoint_filename}", "rb") as handle:
+                    checkpoint = pickle.load(handle)
+                    pop = checkpoint["population"]
+                    self.checkpoint_gen = checkpoint["gen"]
+                    self.checkpoint_trial = checkpoint["trial"]
+                logging.info(f"Loading GEN:{self.checkpoint_gen} TRIAL: {self.checkpoint_trial}")
+            else:
+                logging.info(f"Starting run...")
+
+            # Create directory for saving data
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
 
             # Initialize the population or load models
-            if self.load_checkpoint and n_trial <= self.checkpoint_trial:
+            if self.load_checkpoint and n_trial < self.checkpoint_trial:
                 continue
             else:
                 pop = self.toolbox.population()

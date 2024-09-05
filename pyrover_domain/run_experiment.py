@@ -15,7 +15,7 @@ if __name__ == "__main__":
     # Arg parser variables
     parser = argparse.ArgumentParser()
     parser.add_argument("--hpc", default=False, help="use hpc config files", action="store_true")
-    parser.add_argument("--teaming", default=True, help="use teaming", action="store_true")
+    parser.add_argument("--teaming", default=False, help="use teaming", action="store_true")
     parser.add_argument("--modality", default="multi", help="multi/single", type=str)
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn", type=str)
