@@ -48,11 +48,13 @@ env:
   img_sensor_size: 25
   map_size: [50.0, 50.0]
 
+teaming:
+  use_teaming: True
+  team_size: 2
+
 ccea:
 
-  weight_initialization:
-    lower_bound: -0.5
-    upper_bound: 0.5
+  weight_initialization: "kaiming"
 
   model:
     type: MLP
@@ -64,44 +66,37 @@ ccea:
 
   evaluation:
 
-    evaluation_method: HallOfFame
-
     multi_evaluation:
-      num_evaluations: 10
+      num_evaluations: 5
       aggregation_method: average
-
-    hall_of_fame:
-      alpha: 0.5
     
     fitness_method: aggregate #aggregate/last_step
 
   selection:
-
-    selection_method: NElitesBinaryTournament,
-
-    n_elites_binary_tournament:
-      n_elites: 5
-      include_elites_in_tournament: True
+    n_elites: 0.10                       #Percentage of elites from subpopulation
+    use_extinction: False
+    n_extinction_candidates: 0.10        #Percentage of non-elite individuals to reset.
+    extinction_prob: 0.001      
 
   mutation:
-    mean: 0.0
-    std_deviation: 0.2
+    mean: 1.0
     independent_probability: 0.5
+    std_deviation: 0.05
 
-  num_steps: 200
-  num_generations: 2000
+  num_steps: 100
+  num_generations: 5000
 
 processing:
-  use_multiprocessing: True
-  num_threads: 10
+  use_multiprocessing: False
+  num_threads: 8
 
 experiment:
   trial_name: multi_mlp_decay
-  num_trials: 1
+  num_trials: 3
   
 data:
-  load_checkpoint: False
+  num_gens_between_save: 20
   load_checkpoint_filename: checkpoint.pickle
+  load_checkpoint: False
   save_trajectories: True
   save_checkpoint: True
-  num_gens_between_save: 20

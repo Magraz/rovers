@@ -1,0 +1,135 @@
+env:
+
+  rovers:
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+  pois:
+    - type: decay
+      value: 8.0
+      observation_radius: 4
+      coupling: 2
+      lifespan: 0.40
+      position:
+        spawn_rule: fixed
+        fixed: [15.0, 35.0]
+
+    - type: decay
+      value: 4.0
+      observation_radius: 4
+      coupling: 2
+      lifespan: 0.80
+      position:
+        spawn_rule: fixed
+        fixed: [15.0, 15.0]
+    
+    - type: decay
+      value: 8.0
+      observation_radius: 4
+      coupling: 2
+      lifespan: 0.40
+      position:
+        spawn_rule: fixed
+        fixed: [35.0, 35.0]
+
+    - type: decay
+      value: 4.0
+      observation_radius: 4
+      coupling: 2
+      lifespan: 0.80
+      position:
+        spawn_rule: fixed
+        fixed: [35.0, 15.0]
+
+  img_sensor_size: 25
+  map_size: [50.0, 50.0]
+
+teaming:
+  use_teaming: True
+  team_size: 4
+
+ccea:
+
+  weight_initialization: "kaiming"
+
+  model:
+    type: GRU
+    hidden_layers: [36]
+    rover_max_velocity: 1.0
+
+  population:
+    subpopulation_size: 50
+
+  evaluation:
+
+    multi_evaluation:
+      num_evaluations: 1
+      aggregation_method: average
+    
+    fitness_method: aggregate #aggregate/last_step
+
+  selection:
+    n_elites: 0.10                       #Percentage of elites from subpopulation
+    use_extinction: False
+    n_extinction_candidates: 0.10        #Percentage of non-elite individuals to reset.
+    extinction_prob: 0.001                #Probability of resetting an extinction candidate
+
+  mutation:
+    mean: 1.0
+    independent_probability: 0.5
+    std_deviation: 0.05
+
+  num_steps: 30
+  num_generations: 5000
+
+processing:
+  use_multiprocessing: True
+  num_threads: 8
+
+experiment:
+  trial_name: multi_gru_decay_teaming
+  num_trials: 5
+  
+data:
+  num_gens_between_save: 20
+  load_checkpoint_filename: checkpoint.pickle
+  load_checkpoint: False
+  save_trajectories: True
+  save_checkpoint: True
