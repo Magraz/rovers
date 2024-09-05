@@ -96,7 +96,6 @@ processing:
   num_threads: 10
 
 experiment:
-  trial_name: multi_cnn_decay
   num_trials: 1
   
 data:

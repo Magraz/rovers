@@ -124,7 +124,6 @@ processing:
   num_threads: 8
 
 experiment:
-  trial_name: multi_mlp_decay_teaming
   num_trials: 5
   
 data:

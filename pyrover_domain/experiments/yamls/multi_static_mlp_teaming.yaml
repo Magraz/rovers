@@ -104,7 +104,6 @@ processing:
   num_threads: 8
 
 experiment:
-  trial_name: multi_static_mlp_teaming
   num_trials: 3
   
 data:

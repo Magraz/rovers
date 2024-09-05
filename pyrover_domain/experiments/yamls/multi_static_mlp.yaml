@@ -99,7 +99,6 @@ processing:
   num_threads: 8
 
 experiment:
-  trial_name: multi_mlp_regular
   num_trials: 3
   
 data:

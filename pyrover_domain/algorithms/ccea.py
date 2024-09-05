@@ -79,8 +79,8 @@ class CooperativeCoevolutionaryAlgorithm:
         with open(str(self.config_dir), "r") as file:
             self.config = yaml.safe_load(file)
 
-        # Experiemtn data
-        self.trial_name = self.config["experiment"]["trial_name"]
+        # Experiment data
+        self.trial_name = Path(self.config_dir).stem
 
         # Start by setting up variables for different agents
         self.num_rovers = len(self.config["env"]["rovers"])
