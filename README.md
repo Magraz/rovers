@@ -9,5 +9,15 @@ Run the following commands:
 
 ### To Run Experiment
 
-Run the following command:
+Run the following command for running experiments with all default values:
 - `python3 pyrover/run_experiment.py`
+
+Run the following command for running experiments in different modalities:
+
+- `python3 pyrover/run_experiment.py --modality multi --poi_type static --model mlp --teaming`
+
+- `python3 pyrover/run_experiment.py --modality multi --poi_type decay --model mlp --teaming`
+
+- `python3 pyrover/run_experiment.py --modality multi --poi_type decay --model gru --teaming`
+
+- `python3 pyrover/run_experiment.py --modality multi --poi_type static --model mlp --teaming --hpc`
