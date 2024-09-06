@@ -25,7 +25,10 @@ class CountConstraint {
             dists.push_back(dist);
             if (dist <= rover->obs_radius() && dist <= entity_pack.entity->obs_radius()) {
                 ++count;
-                if (count >= count_constraint) constraint_satisfied = true;
+                if (count >= count_constraint) {
+                    constraint_satisfied = true;
+                    entity_pack.entity->set_observed(true);
+                }
             }
         }
         if (constraint_satisfied) {

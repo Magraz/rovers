@@ -109,7 +109,7 @@ ccea:
     n_elites: 0.10                       #Percentage of elites from subpopulation
 
   mutation:
-    mean: 1.0
+    mean: 0.0
     independent_probability: 0.5
     std_deviation: 0.05
 

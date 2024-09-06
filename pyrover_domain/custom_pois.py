@@ -3,8 +3,6 @@ import numpy as np
 
 """
 A Decaying POI that dissapears over time. 
-T:
-    Total time before complete decay, playing with this value speeds up or slows down decay. Usually multiples of T.
 """
 
 
@@ -21,7 +19,6 @@ class DecayPOI(rovers.IPOI):
     ):
         super().__init__(value, obs_radius)
 
-        # we will use the stealth combined with a constraint defined in the lib
         self.time_step = 0
         self.final_val = 1e-02
         self.constraintPolicy = constraintPolicy
@@ -36,16 +33,13 @@ class DecayPOI(rovers.IPOI):
             case "exp":
                 self.decay_rate = np.log(self.final_val / self.init_value) / lifespan
 
-    # Use a library defined or custom constraint policy with stealth
     def constraint_satisfied(self, entity_pack):
 
         if not self.visible:
-            return False  # "you can't see me"
+            return False
 
         return self.constraintPolicy.is_satisfied(entity_pack)
 
-    # tick() is called at every time step (tick) by the library.
-    # blink based on a coin toss and stealth mastery
     def tick(self):
 
         if not self.visible:
@@ -73,21 +67,63 @@ class BlinkPOI(rovers.IPOI):
     ):
         super().__init__(value, obs_radius)
 
-        # we will use the stealth combined with a constraint defined in the lib
         self.time_step = 0
         self.constraintPolicy = constraintPolicy
         self.visible = True
         self.blink_prob = blink_prob
 
-    # Use a library defined or custom constraint policy with stealth
     def constraint_satisfied(self, entity_pack):
 
         if not self.visible:
-            return False  # "you can't see me"
+            return False
 
         return self.constraintPolicy.is_satisfied(entity_pack)
 
-    # tick() is called at every time step (tick) by the library.
-    # blink based on a coin toss and stealth mastery
     def tick(self):
         self.visible = np.random.choice([True, False], 1, p=[self.blink_prob, 1 - self.blink_prob])[0]
+
+
+"""
+A Ordered POI that can only be observed after all the previous ones have been observed. 
+"""
+
+
+class OrderedPOI(rovers.IPOI):
+    def __init__(
+        self,
+        value: float,
+        obs_radius: float,
+        constraintPolicy: rovers.IConstraint,
+        order: int = 0,
+    ):
+        super().__init__(value, obs_radius)
+
+        self.time_step = 0
+        self.constraintPolicy = constraintPolicy
+        self.order = order
+        self.fulfilled = False
+
+    def constraint_satisfied(self, entity_pack):
+
+        for poi in entity_pack.entities:
+            if poi.order < self.order:
+                if not poi.observed():
+                    return False
+
+        return self.constraintPolicy.is_satisfied(entity_pack)
+
+
+"""
+Custom constraint:
+POIs with this constrait can only be observed \
+after all other POIs have been observed.
+"""
+
+
+class CouplingPOIConstraint(rovers.IConstraint):
+    def is_satisfied(self, entity_pack):
+        for poi in entity_pack.entities:
+            if not poi.observed():
+                return False
+
+        return True

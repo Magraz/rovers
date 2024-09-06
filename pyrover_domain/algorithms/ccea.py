@@ -386,7 +386,7 @@ class CooperativeCoevolutionaryAlgorithm:
         stdev = self.config["ccea"]["mutation"]["std_deviation"]
         mu = self.config["ccea"]["mutation"]["mean"]
 
-        individual *= np.random.normal(loc=mu, scale=stdev, size=np.shape(individual))
+        individual += np.random.normal(loc=mu, scale=stdev, size=np.shape(individual))
 
     def mutate(self, population):
         # Don't mutate the elites

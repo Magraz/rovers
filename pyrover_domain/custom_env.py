@@ -2,7 +2,7 @@ from pyrover_domain.librovers import rovers, thyme
 import numpy as np
 import cppyy
 import random
-from pyrover_domain.custom_pois import DecayPOI
+from pyrover_domain.custom_pois import DecayPOI, OrderedPOI
 from pyrover_domain.custom_sensors import CustomLidar, CustomCamera
 
 
@@ -33,7 +33,12 @@ def createDecayPOI(value, obs_rad, coupling, lifespan):
     return poi
 
 
-def createPOI(value, obs_rad, coupling):
+def createOrderedPOI(value, obs_rad, coupling, order):
+    poi = OrderedPOI(value, obs_rad, rovers.CountConstraint(coupling), order)
+    return poi
+
+
+def createStaticPOI(value, obs_rad, coupling):
     countConstraint = rovers.CountConstraint(coupling)
     poi = rovers.POI[rovers.CountConstraint](value, obs_rad, countConstraint)
     return poi
@@ -98,7 +103,7 @@ def createEnv(config):
         match (poi["type"]):
             case "static":
                 rover_pois.append(
-                    createPOI(
+                    createStaticPOI(
                         value=poi["value"],
                         obs_rad=poi["observation_radius"],
                         coupling=poi["coupling"],
@@ -112,6 +117,16 @@ def createEnv(config):
                         obs_rad=poi["observation_radius"],
                         coupling=poi["coupling"],
                         lifespan=poi["lifespan"] * config["ccea"]["num_steps"],
+                    )
+                )
+
+            case "ordered":
+                rover_pois.append(
+                    createOrderedPOI(
+                        value=poi["value"],
+                        obs_rad=poi["observation_radius"],
+                        coupling=poi["coupling"],
+                        order=poi["order"],
                     )
                 )
 
