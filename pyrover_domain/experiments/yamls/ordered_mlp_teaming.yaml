@@ -25,37 +25,33 @@ env:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
 
-    - observation_radius: 1000.0
-      reward_type: difference
-      sensor_type: lidar
-      resolution: 90
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 25.0]
-    
-    - observation_radius: 1000.0
-      reward_type: difference
-      sensor_type: lidar
-      resolution: 90
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 25.0]
-
   pois:
     - type: ordered
-      value: 40.0
+      value: 1.0
       observation_radius: 4
       coupling: 1
       order: 0
+      lifespan: 0.10
       position:
         spawn_rule: fixed
         fixed: [15.0, 15.0]
-
+    
     - type: ordered
-      value: 10.0
+      value: 1.0
       observation_radius: 4
       coupling: 1
+      order: 1
+      lifespan: 0.10
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 10.0]
+
+    - type: ordered
+      value: 4.0
+      observation_radius: 4
+      coupling: 2
       order: 2
+      lifespan: 0.40
       position:
         spawn_rule: fixed
         fixed: [35.0, 15.0]
@@ -65,7 +61,7 @@ env:
 
 teaming:
   use_teaming: True
-  team_size: 4
+  team_size: 2
 
 ccea:
 
@@ -95,7 +91,7 @@ ccea:
     independent_probability: 0.5
     std_deviation: 0.05
 
-  num_steps: 40
+  num_steps: 30
   num_generations: 5000
 
 processing:

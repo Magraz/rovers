@@ -33,8 +33,8 @@ def createDecayPOI(value, obs_rad, coupling, lifespan):
     return poi
 
 
-def createOrderedPOI(value, obs_rad, coupling, order):
-    poi = OrderedPOI(value, obs_rad, rovers.CountConstraint(coupling), order)
+def createOrderedPOI(value, obs_rad, coupling, lifespan, order):
+    poi = OrderedPOI(value, obs_rad, rovers.CountConstraint(coupling), lifespan, order)
     return poi
 
 
@@ -127,6 +127,7 @@ def createEnv(config):
                         obs_rad=poi["observation_radius"],
                         coupling=poi["coupling"],
                         order=poi["order"],
+                        lifespan=poi["lifespan"] * config["ccea"]["num_steps"],
                     )
                 )
 
