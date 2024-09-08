@@ -22,7 +22,7 @@ env:
       value: 40.0
       observation_radius: 2.5
       coupling: 1
-      order: 1
+      order: 0
       position:
         spawn_rule: fixed
         fixed: [10.0, 10.0]
@@ -31,7 +31,7 @@ env:
       value: 20.0
       observation_radius: 2.5
       coupling: 1
-      order: 0
+      order: 1
       position:
         spawn_rule: fixed
         fixed: [40.0, 10.0]

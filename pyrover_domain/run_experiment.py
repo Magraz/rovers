@@ -16,7 +16,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--hpc", default=False, help="use hpc config files", action="store_true")
     parser.add_argument("--teaming", default=False, help="use teaming", action="store_true")
-    parser.add_argument("--modality", default="multi", help="multi/single", type=str)
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn", type=str)
 
@@ -32,7 +31,7 @@ if __name__ == "__main__":
     teaming = "_teaming" if args["teaming"] else ""
 
     # Set configuration file
-    config_dir = f"{config_dir}/{args['modality']}_{args['poi_type']}_{args['model']}{teaming}.yaml"
+    config_dir = f"{config_dir}/{args['poi_type']}_{args['model']}{teaming}.yaml"
 
     # Run learning algorithm
     runCCEA(config_dir=config_dir)

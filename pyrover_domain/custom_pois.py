@@ -111,19 +111,3 @@ class OrderedPOI(rovers.IPOI):
                     return False
 
         return self.constraintPolicy.is_satisfied(entity_pack)
-
-
-"""
-Custom constraint:
-POIs with this constrait can only be observed \
-after all other POIs have been observed.
-"""
-
-
-class CouplingPOIConstraint(rovers.IConstraint):
-    def is_satisfied(self, entity_pack):
-        for poi in entity_pack.entities:
-            if not poi.observed():
-                return False
-
-        return True
