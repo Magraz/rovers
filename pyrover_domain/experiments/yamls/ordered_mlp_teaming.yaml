@@ -16,7 +16,7 @@ env:
       position:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
-
+    
     - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
@@ -42,38 +42,20 @@ env:
         fixed: [25.0, 25.0]
 
   pois:
-    - type: decay
-      value: 8.0
+    - type: ordered
+      value: 40.0
       observation_radius: 4
-      coupling: 2
-      lifespan: 0.40
-      position:
-        spawn_rule: fixed
-        fixed: [15.0, 35.0]
-
-    - type: decay
-      value: 2.0
-      observation_radius: 4
-      coupling: 2
-      lifespan: 0.80
+      coupling: 1
+      order: 0
       position:
         spawn_rule: fixed
         fixed: [15.0, 15.0]
-    
-    - type: decay
-      value: 8.0
-      observation_radius: 4
-      coupling: 2
-      lifespan: 0.40
-      position:
-        spawn_rule: fixed
-        fixed: [35.0, 35.0]
 
-    - type: decay
-      value: 2.0
+    - type: ordered
+      value: 10.0
       observation_radius: 4
-      coupling: 2
-      lifespan: 0.80
+      coupling: 1
+      order: 2
       position:
         spawn_rule: fixed
         fixed: [35.0, 15.0]
@@ -91,7 +73,7 @@ ccea:
 
   model:
     type: MLP
-    hidden_layers: [64, 64]
+    hidden_layers: [32]
     rover_max_velocity: 1.0
 
   population:
