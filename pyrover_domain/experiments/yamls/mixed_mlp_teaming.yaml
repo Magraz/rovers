@@ -36,7 +36,7 @@ env:
   pois:
     - type: ordered
       value: 1.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 1
       order: 0
       group: "A"
@@ -47,7 +47,7 @@ env:
     
     - type: ordered
       value: 1.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 1
       order: 1
       group: "A"
@@ -58,7 +58,7 @@ env:
 
     - type: ordered
       value: 4.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 1
       order: 2
       group: "A"
@@ -69,7 +69,7 @@ env:
     
     - type: ordered
       value: 1.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 1
       order: 0
       group: "B"
@@ -80,7 +80,7 @@ env:
     
     - type: ordered
       value: 1.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 1
       order: 1
       group: "B"
@@ -91,7 +91,7 @@ env:
 
     - type: ordered
       value: 4.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 1
       order: 2
       group: "B"
@@ -102,10 +102,10 @@ env:
     
     - type: ordered
       value: 2.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 2
-      order: 0
-      group: "C"
+      order: 3
+      group: "A"
       lifespan: 0.02
       position:
         spawn_rule: fixed
@@ -113,10 +113,10 @@ env:
     
     - type: ordered
       value: 2.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 2
-      order: 1
-      group: "C"
+      order: 4
+      group: "A"
       lifespan: 0.02
       position:
         spawn_rule: fixed
@@ -124,10 +124,10 @@ env:
     
     - type: ordered
       value: 8.0
-      observation_radius: 3
+      observation_radius: 2.5
       coupling: 2
-      order: 2
-      group: "C"
+      order: 5
+      group: "A"
       lifespan: 0.50
       position:
         spawn_rule: fixed
