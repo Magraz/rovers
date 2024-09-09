@@ -33,11 +33,6 @@ def createDecayPOI(value, obs_rad, coupling, lifespan):
     return poi
 
 
-def createOrderedPOI(value, obs_rad, coupling, lifespan, order):
-    poi = OrderedPOI(value, obs_rad, rovers.CountConstraint(coupling), lifespan, order)
-    return poi
-
-
 def createStaticPOI(value, obs_rad, coupling):
     countConstraint = rovers.CountConstraint(coupling)
     poi = rovers.POI[rovers.CountConstraint](value, obs_rad, countConstraint)
@@ -112,23 +107,24 @@ def createEnv(config):
 
             case "decay":
                 rover_pois.append(
-                    createDecayPOI(
+                    DecayPOI(
                         value=poi["value"],
-                        obs_rad=poi["observation_radius"],
-                        coupling=poi["coupling"],
+                        obs_radius=poi["observation_radius"],
+                        constraintPolicy=rovers.CountConstraint(poi["coupling"]),
                         lifespan=poi["lifespan"] * config["ccea"]["num_steps"],
                     )
                 )
 
             case "ordered":
                 rover_pois.append(
-                    createOrderedPOI(
+                    OrderedPOI(
                         value=poi["value"],
-                        obs_rad=poi["observation_radius"],
-                        coupling=poi["coupling"],
-                        order=poi["order"],
+                        obs_radius=poi["observation_radius"],
+                        constraintPolicy=rovers.CountConstraint(poi["coupling"]),
                         lifespan=poi["lifespan"] * config["ccea"]["num_steps"],
-                    )
+                        group=poi["group"],
+                        order=poi["order"],
+                    ),
                 )
 
     pois = rover_pois

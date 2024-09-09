@@ -1,0 +1,186 @@
+env:
+
+  rovers:
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+    
+    - observation_radius: 1000.0
+      reward_type: difference
+      sensor_type: lidar
+      resolution: 90
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 25.0]
+
+  pois:
+    - type: ordered
+      value: 1.0
+      observation_radius: 3
+      coupling: 1
+      order: 0
+      group: "A"
+      lifespan: 0.02
+      position:
+        spawn_rule: fixed
+        fixed: [15.0, 20.0]
+    
+    - type: ordered
+      value: 1.0
+      observation_radius: 3
+      coupling: 1
+      order: 1
+      group: "A"
+      lifespan: 0.02
+      position:
+        spawn_rule: fixed
+        fixed: [10.0, 30.0]
+
+    - type: ordered
+      value: 4.0
+      observation_radius: 3
+      coupling: 1
+      order: 2
+      group: "A"
+      lifespan: 0.10
+      position:
+        spawn_rule: fixed
+        fixed: [5.0, 20.0]
+    
+    - type: ordered
+      value: 1.0
+      observation_radius: 3
+      coupling: 1
+      order: 0
+      group: "B"
+      lifespan: 0.02
+      position:
+        spawn_rule: fixed
+        fixed: [40.0, 30.0]
+    
+    - type: ordered
+      value: 1.0
+      observation_radius: 3
+      coupling: 1
+      order: 1
+      group: "B"
+      lifespan: 0.02
+      position:
+        spawn_rule: fixed
+        fixed: [45.0, 20.0]
+
+    - type: ordered
+      value: 4.0
+      observation_radius: 3
+      coupling: 1
+      order: 2
+      group: "B"
+      lifespan: 0.10
+      position:
+        spawn_rule: fixed
+        fixed: [35.0, 20.0]
+    
+    - type: ordered
+      value: 2.0
+      observation_radius: 3
+      coupling: 2
+      order: 0
+      group: "C"
+      lifespan: 0.02
+      position:
+        spawn_rule: fixed
+        fixed: [25.0, 10.0]
+    
+    - type: ordered
+      value: 2.0
+      observation_radius: 3
+      coupling: 2
+      order: 1
+      group: "C"
+      lifespan: 0.02
+      position:
+        spawn_rule: fixed
+        fixed: [20.0, 5.0]
+    
+    - type: ordered
+      value: 8.0
+      observation_radius: 3
+      coupling: 2
+      order: 2
+      group: "C"
+      lifespan: 0.50
+      position:
+        spawn_rule: fixed
+        fixed: [30.0, 5.0]
+
+  img_sensor_size: 25
+  map_size: [50.0, 50.0]
+
+teaming:
+  use_teaming: True
+  team_size: 2
+
+ccea:
+
+  weight_initialization: "kaiming"
+
+  model:
+    type: GRU
+    hidden_layers: [36]
+    rover_max_velocity: 1.0
+
+  population:
+    subpopulation_size: 50
+
+  evaluation:
+
+    multi_evaluation:
+      num_evaluations: 1
+      aggregation_method: average
+    
+    fitness_method: aggregate #aggregate/last_step
+
+  selection:
+    n_elites: 0.10                       #Percentage of elites from subpopulation
+
+  mutation:
+    mean: 0.0
+    independent_probability: 0.5
+    std_deviation: 0.05
+
+  num_steps: 100
+  num_generations: 5000
+
+processing:
+  use_multiprocessing: True
+  num_threads: 8
+
+experiment:
+  num_trials: 5
+  
+data:
+  num_gens_between_save: 20
+  load_checkpoint_filename: checkpoint.pickle
+  load_checkpoint: False
+  save_trajectories: True
+  save_checkpoint: True

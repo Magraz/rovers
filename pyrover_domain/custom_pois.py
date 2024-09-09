@@ -95,13 +95,15 @@ class OrderedPOI(rovers.IPOI):
         obs_radius: float,
         constraintPolicy: rovers.IConstraint,
         lifespan: int,
-        order: int = 0,
+        group: int,
+        order: int,
     ):
         super().__init__(value, obs_radius)
 
         self.time_step = 0
         self.constraintPolicy = constraintPolicy
         self.order = order
+        self.group = group
         self.lifespan = lifespan
         self.visible = True
         self.start_decay = False
@@ -117,9 +119,10 @@ class OrderedPOI(rovers.IPOI):
             self.decay_start_time = self.time_step
 
         for poi in entity_pack.entities:
-            if poi.order < self.order:
-                if not poi.observed():
-                    return False
+            if poi.group == self.group:
+                if poi.order < self.order:
+                    if not poi.observed():
+                        return False
 
         return self.constraintPolicy.is_satisfied(entity_pack)
 
