@@ -50,25 +50,34 @@ class Team(object):
         self.combination = combination if combination is not None else []
 
 
+class JointState(object):
+    def __init__(
+        self,
+    ):
+        self.agent_positions = []
+        self.poi_positions = []
+
+
 class JointTrajectory(object):
     def __init__(
         self,
-        joint_state_trajectory,
-        joint_observation_trajectory,
-        joint_action_trajectory,
+        joint_state_traj: JointState,
+        joint_obs_traj,
+        joint_act_traj,
     ):
-        self.states = joint_state_trajectory
-        self.observations = joint_observation_trajectory
-        self.actions = joint_action_trajectory
+        self.states = joint_state_traj
+        self.observations = joint_obs_traj
+        self.actions = joint_act_traj
 
 
 class EvalInfo(object):
-    def __init__(self, team_id, team_formation, agent_fitnesses, team_fitness, joint_trajectory):
+    def __init__(self, team_id, team_formation, agent_fitnesses, team_fitness, joint_traj, rewards_traj):
         self.team_id = team_id
         self.team_formation = team_formation
         self.agent_fitnesses = agent_fitnesses
         self.team_fitness = team_fitness
-        self.joint_trajectory = joint_trajectory
+        self.joint_traj = joint_traj
+        self.rewards_traj = rewards_traj
 
 
 class CooperativeCoevolutionaryAlgorithm:
@@ -96,9 +105,12 @@ class CooperativeCoevolutionaryAlgorithm:
 
         self.subpopulation_size = self.config["ccea"]["population"]["subpopulation_size"]
 
-        self.num_hidden = self.config["ccea"]["model"]["hidden_layers"]
-        self.model_type = self.config["ccea"]["model"]["type"]
+        self.policy_num_hidden = self.config["ccea"]["policy"]["hidden_layers"]
+        self.policy_type = self.config["ccea"]["policy"]["type"]
         self.weight_initialization = self.config["ccea"]["weight_initialization"]
+
+        self.fit_crit_type = self.config["ccea"]["fitness_critic"]["type"]
+        self.fit_crit_num_hidden = self.config["ccea"]["fitness_critic"]["hidden_layers"]
 
         self.sensor_type = self.config["env"]["rovers"][0]["sensor_type"]
         self.image_size = self.config["env"]["img_sensor_size"]
@@ -181,12 +193,12 @@ class CooperativeCoevolutionaryAlgorithm:
         return creator.Individual(params[:].cpu().numpy().astype(np.float64))
 
     def generateTemplateNN(self):
-        match (self.model_type):
+        match (self.policy_type):
 
             case "GRU":
                 agent_nn = GRU_Policy(
                     input_size=2 * self.n_rover_sectors,
-                    hidden_size=self.num_hidden[0],
+                    hidden_size=self.policy_num_hidden[0],
                     output_size=2,
                     n_layers=1,
                 ).to(DEVICE)
@@ -199,8 +211,8 @@ class CooperativeCoevolutionaryAlgorithm:
             case "MLP":
                 agent_nn = MLP_Policy(
                     input_size=2 * self.n_rover_sectors,
-                    hidden_layers=len(self.num_hidden),
-                    hidden_size=self.num_hidden[0],
+                    hidden_layers=len(self.policy_num_hidden),
+                    hidden_size=self.policy_num_hidden[0],
                     output_size=2,
                 ).to(DEVICE)
 
@@ -252,6 +264,26 @@ class CooperativeCoevolutionaryAlgorithm:
 
         return teams
 
+    def process_observation(self, observation):
+        obs_tensor = observation.data()
+
+        # State pre processing based on sensor type
+        match (self.sensor_type):
+
+            case "lidar":
+                obs_tensor.reshape((self.n_rover_sectors * 2,))  # State space is 8 dimensional
+                obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=8)
+
+            case "camera":
+                flat_img_size = int(np.pow(self.image_size, 2) * 2)
+                obs_tensor.reshape((flat_img_size,))
+                obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=flat_img_size)
+                obs_tensor = np.reshape(
+                    obs_tensor, (2, self.image_size, self.image_size)
+                )  # 2 channels since we have a POI image and a Rover Image
+
+        return obs_tensor
+
     def evaluateTeams(self, teams: list[Team]):
         if self.use_multiprocessing:
             jobs = self.map(self.evaluateTeam, teams)
@@ -279,22 +311,15 @@ class CooperativeCoevolutionaryAlgorithm:
         agent_positions = [[agent.position().x, agent.position().y] for agent in env.rovers()]
         poi_positions = [[poi.position().x, poi.position().y] for poi in env.pois()]
 
-        # Change observations type to numpy
-        observations_arrs = []
-
-        for observation in observations:
-            observation_arr = []
-
-            for i in range(len(observation)):
-                observation_arr.append(observation(i))
-
-            observation_arr = np.array(observation_arr, dtype=np.float64)
-            observations_arrs.append(observation_arr)
+        # Process initial observations
+        observations_arrs = [self.process_observation(obs) for obs in observations]
 
         # Set evaluation storage variables
-        joint_state_trajectory = [agent_positions + poi_positions]
-        joint_observation_trajectory = [observations_arrs]
-        joint_action_trajectory = []
+        joint_state_traj = JointState()
+        joint_state_traj.agent_positions.append(agent_positions)
+        joint_state_traj.poi_positions.append(poi_positions)
+        joint_obs_traj = [observations_arrs]
+        joint_act_traj = []
         rewards_list = []
         G_list = []
 
@@ -305,36 +330,21 @@ class CooperativeCoevolutionaryAlgorithm:
             observation_arrs = []
             actions_arrs = []
 
-            for _, (observation, agent_nn) in enumerate(zip(observations, agent_nns)):
+            for observation, agent_nn in zip(observations, agent_nns):
 
-                obs_tensor = observation.data()
+                obs_array = self.process_observation(observation)
 
-                # State pre processing based on sensor type
-                match (self.sensor_type):
-
-                    case "lidar":
-                        obs_tensor.reshape((self.n_rover_sectors * 2,))  # State space is 8 dimensional
-                        obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=8)
-
-                    case "camera":
-                        flat_img_size = int(np.pow(self.image_size, 2) * 2)
-                        obs_tensor.reshape((flat_img_size,))
-                        obs_tensor = np.frombuffer(obs_tensor, dtype=np.float64, count=flat_img_size)
-                        obs_tensor = np.reshape(
-                            obs_tensor, (2, self.image_size, self.image_size)
-                        )  # 2 channels since we have a POI image and a Rover Image
-
-                obs_tensor = torch.from_numpy(obs_tensor).to(DEVICE)
+                obs_tensor = torch.from_numpy(obs_array).to(DEVICE)
 
                 action = agent_nn.forward(obs_tensor.unsqueeze(0))
 
                 action_arr = action.squeeze().cpu().detach().numpy()
 
                 # Multiply by agent velocity
-                action_arr *= self.config["ccea"]["model"]["rover_max_velocity"]
+                action_arr *= self.config["ccea"]["policy"]["rover_max_velocity"]
 
                 # Save this info for debugging purposes
-                observation_arrs.append(observation_arr)
+                observation_arrs.append(obs_array)
                 actions_arrs.append(action_arr)
 
             actions = [rovers.tensor(action_arr) for action_arr in actions_arrs]
@@ -346,11 +356,12 @@ class CooperativeCoevolutionaryAlgorithm:
             poi_positions = [[poi.position().x, poi.position().y] for poi in env.pois()]
 
             # Store joint actions and states
-            joint_observation_trajectory.append(observation_arrs)
-            joint_action_trajectory.append(actions_arrs)
-            joint_state_trajectory.append(agent_positions + poi_positions)
+            joint_obs_traj.append(observation_arrs)
+            joint_act_traj.append(actions_arrs)
+            joint_state_traj.agent_positions.append(agent_positions)
+            joint_state_traj.poi_positions.append(poi_positions)
 
-            # Store rewards of every episode
+            # Store rewards of every episode (could be G or D depending on yaml config)
             rewards_list.append(list(rewards))
 
             # Append G for the episode to list
@@ -374,11 +385,12 @@ class CooperativeCoevolutionaryAlgorithm:
             team_formation=team.combination,
             agent_fitnesses=tuple(zip(team.combination, rewards)),
             team_fitness=team_fitness,
-            joint_trajectory=JointTrajectory(
-                joint_state_trajectory,
-                joint_observation_trajectory,
-                joint_action_trajectory,
+            joint_traj=JointTrajectory(
+                joint_state_traj,
+                joint_obs_traj,
+                joint_act_traj,
             ),
+            rewards_traj=rewards_list,
         )
 
     def mutateIndividual(self, individual):
@@ -544,7 +556,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # Now fill in the csv with the data
                 # One line at a time
-                joint_traj = eval_info.joint_trajectory
+                joint_traj = eval_info.joint_traj
 
                 # We're going to pad the actions with None because
                 # the agents cannot take actions at the last timestep, but
@@ -555,14 +567,22 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 joint_traj.actions.append(action_padding)
 
-                for joint_state, joint_observation, joint_action in zip(
-                    joint_traj.states, joint_traj.observations, joint_traj.actions
+                for agent_positions, poi_positions, joint_observation, joint_action in zip(
+                    joint_traj.states.agent_positions,
+                    joint_traj.states.poi_positions,
+                    joint_traj.observations,
+                    joint_traj.actions,
                 ):
                     # Aggregate state info
                     state_list = []
-                    for state in joint_state:
-                        state_list += [str(state_var) for state_var in state]
-                    state_str = ",".join(state_list)
+
+                    for pos in agent_positions:
+                        state_list += [str(coord) for coord in pos]
+                        state_str = ",".join(state_list)
+
+                    for pos in poi_positions:
+                        state_list += [str(coord) for coord in pos]
+                        state_str = ",".join(state_list)
 
                     # Aggregate observation info
                     observation_list = []
@@ -581,6 +601,24 @@ class CooperativeCoevolutionaryAlgorithm:
                     csv_line = f"{team_formation_str},{state_str},{observation_str},{action_str}\n"
                     # Write it out
                     file.write(csv_line)
+
+    def init_fitness_critics(self):
+        fitness_critics = []
+
+        for _ in range(self.num_rovers):
+
+            match self.fit_crit_type:
+                case "MLP":
+                    fit_crit_nn = MLP_Policy(
+                        input_size=2 * self.n_rover_sectors,
+                        hidden_layers=len(self.fit_crit_num_hidden),
+                        hidden_size=self.fit_crit_num_hidden[0],
+                        output_size=1,
+                    ).to(DEVICE)
+
+            fitness_critics.append(fit_crit_nn)
+
+        return fitness_critics
 
     def run(self):
 
@@ -613,6 +651,9 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Create csv file for saving evaluation fitnesses
                 self.createEvalFitnessCSV(trial_dir)
 
+            # Initialize fitness critics
+            fitness_critics = self.init_fitness_critics()
+
             for n_gen in tqdm(range(self.n_gens + 1)):
 
                 # Set gen counter global var
@@ -637,6 +678,8 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # Evaluate each team
                 eval_infos = self.evaluateTeams(teams)
+
+                # Train Fitness Critics
 
                 # Now assign fitnesses to each individual
                 self.assignFitnesses(teams, eval_infos)
