@@ -7,9 +7,11 @@ import torch
 import torch.multiprocessing as mp
 import random
 
-from pyrover_domain.models.mlp import MLP_Policy
-from pyrover_domain.models.gru import GRU_Policy
-from pyrover_domain.models.cnn import CNN_Policy
+from pyrover_domain.policies.mlp import MLP_Policy
+from pyrover_domain.policies.gru import GRU_Policy
+from pyrover_domain.policies.cnn import CNN_Policy
+
+from pyrover_domain.fitness_critic.fitness_critic import FitnessCritic
 
 from pyrover_domain.librovers import rovers
 from pyrover_domain.custom_env import createEnv
@@ -71,13 +73,12 @@ class JointTrajectory(object):
 
 
 class EvalInfo(object):
-    def __init__(self, team_id, team_formation, agent_fitnesses, team_fitness, joint_traj, rewards_traj):
+    def __init__(self, team_id, team_formation, agent_fitnesses, team_fitness, joint_traj):
         self.team_id = team_id
         self.team_formation = team_formation
         self.agent_fitnesses = agent_fitnesses
         self.team_fitness = team_fitness
         self.joint_traj = joint_traj
-        self.rewards_traj = rewards_traj
 
 
 class CooperativeCoevolutionaryAlgorithm:
@@ -94,6 +95,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Start by setting up variables for different agents
         self.num_rovers = len(self.config["env"]["rovers"])
         self.use_teaming = self.config["teaming"]["use_teaming"]
+        self.use_fit_crit = self.config["fitness_critic"]["use_fit_crit"]
 
         self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
         self.team_size = self.config["teaming"]["team_size"] if self.use_teaming else self.num_rovers
@@ -109,8 +111,8 @@ class CooperativeCoevolutionaryAlgorithm:
         self.policy_type = self.config["ccea"]["policy"]["type"]
         self.weight_initialization = self.config["ccea"]["weight_initialization"]
 
-        self.fit_crit_type = self.config["ccea"]["fitness_critic"]["type"]
-        self.fit_crit_num_hidden = self.config["ccea"]["fitness_critic"]["hidden_layers"]
+        self.fit_crit_type = self.config["fitness_critic"]["type"]
+        self.fit_crit_num_hidden = self.config["fitness_critic"]["hidden_layers"]
 
         self.sensor_type = self.config["env"]["rovers"][0]["sensor_type"]
         self.image_size = self.config["env"]["img_sensor_size"]
@@ -243,7 +245,7 @@ class CooperativeCoevolutionaryAlgorithm:
         else:
             joint_policies = self.subpopulation_size
 
-        # For each individual in a subpopulation
+        # For each row in the population of subpops (grabs an individual from each row in the subpops)
         for i in range(joint_policies):
 
             if for_evaluation:
@@ -387,10 +389,9 @@ class CooperativeCoevolutionaryAlgorithm:
             team_fitness=team_fitness,
             joint_traj=JointTrajectory(
                 joint_state_traj,
-                joint_obs_traj,
+                np.array(joint_obs_traj),
                 joint_act_traj,
             ),
-            rewards_traj=rewards_list,
         )
 
     def mutateIndividual(self, individual):
@@ -435,27 +436,63 @@ class CooperativeCoevolutionaryAlgorithm:
         for subpop in population:
             random.shuffle(subpop)
 
-    def assignFitnesses(self, teams: list[Team], eval_infos: list[EvalInfo]):
+    def groupTeamsAndEvalInfos(self, teams: list[Team], eval_infos: list[EvalInfo]):
+
+        grouped_teams = []
+        grouped_eval_infos = []
+
+        for team_id, _ in enumerate(teams[:: self.n_eval_per_team_set]):
+
+            grouped_teams.append(teams[team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set])
+            grouped_eval_infos.append(
+                eval_infos[team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set]
+            )
+
+        return grouped_teams, grouped_eval_infos
+
+    def trainFitnessCritics(
+        self,
+        fitness_critics: list[FitnessCritic],
+        eval_infos: list[EvalInfo],
+    ):
+        # Collect trajectories from eval_infos
+        for eval_info in eval_infos:
+            for idx in eval_info.team_formation:
+                fitness_critics[idx].add(
+                    eval_info.joint_traj.observations[:, idx, :], np.float64(eval_info.team_fitness)
+                )
+
+        # Train fitness critics
+        for fit_crit in fitness_critics:
+            fit_crit.train()
+
+    def assignFitnesses(
+        self,
+        fitness_critics: list[FitnessCritic],
+        grouped_teams: list[list[Team]],
+        grouped_eval_infos: list[list[EvalInfo]],
+    ):
         # There may be several eval_infos for the same team
         # This is the case if there are many evaluations per team
         # In that case, we need to aggregate those many evaluations into one fitness
-        for team_id, team in enumerate(teams[:: self.n_eval_per_team_set]):
-
-            # Get all the eval infos for this team
-            team_eval_infos = eval_infos[team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set]
-            teams_in_set = teams[team_id * self.n_eval_per_team_set : (team_id + 1) * self.n_eval_per_team_set]
+        for teams, eval_infos in zip(grouped_teams, grouped_eval_infos):
 
             # Aggregate the fitnesses into a big numpy array
             accumulated_fitnesses = [0 for _ in range(self.num_rovers)]
 
-            for eval_info in team_eval_infos:
+            for eval_info in eval_infos:
                 for idx, fit in eval_info.agent_fitnesses:
-                    accumulated_fitnesses[idx] += fit
+                    if self.use_fit_crit:
+                        accumulated_fitnesses[idx] += fitness_critics[idx].evaluate(
+                            eval_info.joint_traj.observations[:, idx, :]
+                        )
+                    else:
+                        accumulated_fitnesses[idx] += fit
 
             # Group all individuals in teams within this set
             individuals_in_set = {}
 
-            for team in teams_in_set:
+            for team in teams:
                 for idx, individual in zip(team.combination, team.individuals):
                     individuals_in_set[idx] = individual
 
@@ -602,24 +639,6 @@ class CooperativeCoevolutionaryAlgorithm:
                     # Write it out
                     file.write(csv_line)
 
-    def init_fitness_critics(self):
-        fitness_critics = []
-
-        for _ in range(self.num_rovers):
-
-            match self.fit_crit_type:
-                case "MLP":
-                    fit_crit_nn = MLP_Policy(
-                        input_size=2 * self.n_rover_sectors,
-                        hidden_layers=len(self.fit_crit_num_hidden),
-                        hidden_size=self.fit_crit_num_hidden[0],
-                        output_size=1,
-                    ).to(DEVICE)
-
-            fitness_critics.append(fit_crit_nn)
-
-        return fitness_critics
-
     def run(self):
 
         for n_trial in range(self.config["experiment"]["num_trials"]):
@@ -652,7 +671,9 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.createEvalFitnessCSV(trial_dir)
 
             # Initialize fitness critics
-            fitness_critics = self.init_fitness_critics()
+            fitness_critics = [
+                FitnessCritic(device=DEVICE, model_type=self.fit_crit_type, loss_f=0) for _ in range(self.num_rovers)
+            ]
 
             for n_gen in tqdm(range(self.n_gens + 1)):
 
@@ -679,10 +700,14 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Evaluate each team
                 eval_infos = self.evaluateTeams(teams)
 
+                # Regroup sets of teams with their respective sets of eval_infos
+                grouped_teams, grouped_eval_infos = self.groupTeamsAndEvalInfos(teams, eval_infos)
+
                 # Train Fitness Critics
+                self.trainFitnessCritics(fitness_critics, eval_infos)
 
                 # Now assign fitnesses to each individual
-                self.assignFitnesses(teams, eval_infos)
+                self.assignFitnesses(fitness_critics, grouped_teams, grouped_eval_infos)
 
                 # Evaluate a team with the best individual from each subpopulation
                 eval_infos = self.evaluateBestTeam(offspring)

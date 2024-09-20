@@ -9,9 +9,6 @@ if __name__ == "__main__":
     # Set for CUDA to allow multiprocessing
     mp.set_start_method("forkserver")
 
-    # Disable gradient calculations
-    set_grad_enabled(False)
-
     # Arg parser variables
     parser = argparse.ArgumentParser()
     parser.add_argument("--hpc", default=False, help="use hpc config files", action="store_true")
@@ -32,6 +29,8 @@ if __name__ == "__main__":
 
     # Set configuration file
     config_dir = f"{config_dir}/{args['poi_type']}_{args['model']}{teaming}.yaml"
+
+    # config_dir = f"{config_dir}/order_mlp.yaml"
 
     # Run learning algorithm
     runCCEA(config_dir=config_dir)

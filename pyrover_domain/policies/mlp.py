@@ -19,6 +19,11 @@ class MLP_Policy(nn.Module):  # inheriting from nn.Module!
                 self.fc2 = nn.Linear(hidden_size, hidden_size)
 
         self.output = nn.Linear(hidden_size, output_size)
+
+        # Disable gradient calcs
+        for p in self.parameters():
+            p.requires_grad_(False)
+
         self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
 
     def forward(self, x: torch.Tensor):
