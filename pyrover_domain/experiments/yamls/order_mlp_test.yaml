@@ -1,7 +1,7 @@
 env:
 
   rovers:
-    - observation_radius: 25.0
+    - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
       resolution: 90
@@ -9,23 +9,7 @@ env:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
 
-    - observation_radius: 25.0
-      reward_type: difference
-      sensor_type: lidar
-      resolution: 90
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 25.0]
-    
-    - observation_radius: 25.0
-      reward_type: difference
-      sensor_type: lidar
-      resolution: 90
-      position:
-        spawn_rule: fixed
-        fixed: [25.0, 25.0]
-
-    - observation_radius: 25.0
+    - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
       resolution: 90
@@ -34,51 +18,64 @@ env:
         fixed: [25.0, 25.0]
 
   pois:
-    - type: static
-      value: 4.0
+    - type: ordered
+      value: 40.0
       observation_radius: 2.5
-      coupling: 2
+      coupling: 1
+      order: 1
+      group: "B"
+      lifespan: 0.10
       position:
         spawn_rule: fixed
-        fixed: [10.0, 20.0]
+        fixed: [10.0, 10.0]
     
-    - type: static
-      value: 2.0
+    - type: ordered
+      value: 40.0
       observation_radius: 2.5
-      coupling: 2
+      coupling: 1
+      order: 0
+      group: "B"
+      lifespan: 0.10
       position:
         spawn_rule: fixed
-        fixed: [25.0, 10.0]
+        fixed: [30.0, 5.0]
 
-    - type: static
-      value: 4.0
+    - type: ordered
+      value: 20.0
       observation_radius: 2.5
-      coupling: 2
+      coupling: 1
+      order: 2
+      group: "A"
+      lifespan: 0.10
       position:
         spawn_rule: fixed
-        fixed: [40.0, 20.0]
+        fixed: [40.0, 10.0]
+
+    - type: ordered
+      value: 10.0
+      observation_radius: 2.5
+      coupling: 1
+      order: 0
+      group: "A"
+      lifespan: 0.10
+      position:
+        spawn_rule: fixed
+        fixed: [40.0, 40.0]
 
   img_sensor_size: 25
   map_size: [50.0, 50.0]
 
 teaming:
   use_teaming: False
-  team_size: 0
-
-fitness_critic:
-    use_fit_crit: True
-    epochs: 10
-    type: MLP
-    loss_type: MSE #MSE/MAE/MSE+MAE
-    hidden_layers: [80, 80]
+  team_size: 2
 
 ccea:
 
   weight_initialization: "kaiming"
 
-  policy:
+  model:
     type: MLP
-    hidden_layers: [64]
+    hidden_layers: [32]
     rover_max_velocity: 1.0
 
   population:
@@ -87,28 +84,31 @@ ccea:
   evaluation:
 
     multi_evaluation:
-      num_evaluations: 2
-      aggregation_method: sum
+      num_evaluations: 5
+      aggregation_method: average
     
-    fitness_method: last_step #aggregate/last_step
+    fitness_method: aggregate #aggregate/last_step
 
   selection:
     n_elites: 0.10                       #Percentage of elites from subpopulation
+    use_extinction: False
+    n_extinction_candidates: 0.10        #Percentage of non-elite individuals to reset.
+    extinction_prob: 0.001      
 
   mutation:
     mean: 1.0
     independent_probability: 0.5
     std_deviation: 0.05
 
-  num_steps: 30
+  num_steps: 100
   num_generations: 5000
 
 processing:
-  use_multiprocessing: True
-  num_threads: 14
+  use_multiprocessing: False
+  num_threads: 8
 
 experiment:
-  num_trials: 5
+  num_trials: 3
   
 data:
   num_gens_between_save: 20
