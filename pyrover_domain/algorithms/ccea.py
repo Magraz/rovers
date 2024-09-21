@@ -466,7 +466,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Train fitness critics
         for fit_crit in fitness_critics:
-            fit_crit.train()
+            fit_crit.train(epochs=self.config["fitness_critic"]["epochs"])
 
     def assignFitnesses(
         self,

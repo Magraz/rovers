@@ -55,7 +55,7 @@ class FitnessCritic:
         result = self.model.forward(torch.from_numpy(trajectory).to(self.device)).cpu().detach().numpy()
         return np.max(result)
 
-    def train(self, epochs: int = 3):
+    def train(self, epochs: int):
         traj_dataset = None
         loss_arr = []
 
