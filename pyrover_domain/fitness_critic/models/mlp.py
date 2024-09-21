@@ -1,4 +1,5 @@
 import torch
+import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
 from copy import deepcopy
@@ -14,7 +15,7 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
         input_size: int = 8,
         hidden_layers: int = 2,
         hidden_size: int = 80,
-        lr: float = 5e-3,
+        lr: float = 1e-3,
     ):
         super(MLP_Model, self).__init__()
 
@@ -39,23 +40,22 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
         elif loss_fn == 2:
             self.loss_func = lambda x, y: self.alignment_loss(x, y) + nn.MSELoss(reduction="sum")(x, y)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
     def forward(self, x):
-        out = F.leaky_relu(self.fc1(x))
+        out = F.tanh(self.fc1(x))
 
         match (self.hidden_layers):
             case 2:
-                out = F.leaky_relu(self.fc2(out))
+                out = F.tanh(self.fc2(out))
 
         return self.output(out)
 
     def train(self, x, y, shaping=False):
 
-        pred = self.forward(x)
-
-        loss = self.loss_func(pred, y)
         self.optimizer.zero_grad()
+        pred = self.forward(x)
+        loss = self.loss_func(pred, y)
         loss.backward()
         self.optimizer.step()
 

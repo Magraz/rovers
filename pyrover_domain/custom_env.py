@@ -67,9 +67,12 @@ def resolvePositionSpawnRule(position_dict):
 def createEnv(config):
     Env = rovers.Environment[rovers.CustomInit]
 
+    use_teaming = config["teaming"]["use_teaming"]
+    team_size = config["teaming"]["team_size"] if use_teaming else config["env"]["rovers"]
+
     # Aggregate all of the positions of agents
     agent_positions = []
-    for rover in config["env"]["rovers"][: config["teaming"]["team_size"]]:
+    for rover in team_size:
         position = resolvePositionSpawnRule(rover["position"])
         agent_positions.append(position)
 
@@ -87,7 +90,7 @@ def createEnv(config):
             sensor_type=rover["sensor_type"],
             resolution=rover["resolution"],
         )
-        for rover in config["env"]["rovers"][: config["teaming"]["team_size"]]
+        for rover in team_size
     ]
 
     agents = rovers_

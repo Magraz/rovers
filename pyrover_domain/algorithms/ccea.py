@@ -96,6 +96,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.num_rovers = len(self.config["env"]["rovers"])
         self.use_teaming = self.config["teaming"]["use_teaming"]
         self.use_fit_crit = self.config["fitness_critic"]["use_fit_crit"]
+        self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
 
         self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
         self.team_size = self.config["teaming"]["team_size"] if self.use_teaming else self.num_rovers
@@ -396,10 +397,11 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def mutateIndividual(self, individual):
 
-        stdev = self.config["ccea"]["mutation"]["std_deviation"]
-        mu = self.config["ccea"]["mutation"]["mean"]
-
-        individual += np.random.normal(loc=mu, scale=stdev, size=np.shape(individual))
+        individual *= np.random.normal(
+            loc=self.config["ccea"]["mutation"]["mean"],
+            scale=self.config["ccea"]["mutation"]["std_deviation"],
+            size=np.shape(individual),
+        )
 
     def mutate(self, population):
         # Don't mutate the elites
@@ -481,7 +483,9 @@ class CooperativeCoevolutionaryAlgorithm:
             accumulated_fitnesses = [0 for _ in range(self.num_rovers)]
 
             for eval_info in eval_infos:
+
                 for idx, fit in eval_info.agent_fitnesses:
+
                     if self.use_fit_crit:
                         accumulated_fitnesses[idx] += fitness_critics[idx].evaluate(
                             eval_info.joint_traj.observations[:, idx, :]
@@ -671,8 +675,19 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.createEvalFitnessCSV(trial_dir)
 
             # Initialize fitness critics
+            loss_fn = 0
+
+            match self.fit_crit_loss_type:
+                case "MSE":
+                    loss_fn = 0
+                case "MAE":
+                    loss_fn = 1
+                case "MSE+MAE":
+                    loss_fn = 2
+
             fitness_critics = [
-                FitnessCritic(device=DEVICE, model_type=self.fit_crit_type, loss_f=0) for _ in range(self.num_rovers)
+                FitnessCritic(device=DEVICE, model_type=self.fit_crit_type, loss_fn=loss_fn, episode_size=self.n_steps)
+                for _ in range(self.num_rovers)
             ]
 
             for n_gen in tqdm(range(self.n_gens + 1)):
@@ -700,11 +715,12 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Evaluate each team
                 eval_infos = self.evaluateTeams(teams)
 
+                # Train Fitness Critics
+                if self.use_fit_crit:
+                    self.trainFitnessCritics(fitness_critics, eval_infos)
+
                 # Regroup sets of teams with their respective sets of eval_infos
                 grouped_teams, grouped_eval_infos = self.groupTeamsAndEvalInfos(teams, eval_infos)
-
-                # Train Fitness Critics
-                self.trainFitnessCritics(fitness_critics, eval_infos)
 
                 # Now assign fitnesses to each individual
                 self.assignFitnesses(fitness_critics, grouped_teams, grouped_eval_infos)
