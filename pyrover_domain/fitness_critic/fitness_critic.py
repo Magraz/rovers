@@ -4,11 +4,12 @@ from random import sample
 import torch
 from torch.utils.data import Dataset, DataLoader
 from pyrover_domain.fitness_critic.models.mlp import MLP_Model
+from pyrover_domain.fitness_critic.models.attention import Attention_Model
 
 
 class TrajectoryRewardDataset(Dataset):
 
-    def __init__(self, traj_hist):
+    def __init__(self, traj_hist, model_type: str):
 
         if len(traj_hist) < 256:
             trajG = traj_hist
@@ -18,9 +19,14 @@ class TrajectoryRewardDataset(Dataset):
         self.observations, self.reward = [], []
 
         for traj, g in trajG:
-            for s in traj:  # train whole trajectory
-                self.observations.append(s)
-                self.reward.append([g])
+            match model_type:
+                case "MLP":
+                    for s in traj:  # train whole trajectory
+                        self.observations.append(s)
+                        self.reward.append([g])
+                case "ATTENTION":
+                    self.observations.append(traj)
+                    self.reward.append([g])
 
         self.observations, self.reward = np.array(self.observations), np.array(self.reward)
 
@@ -38,7 +44,7 @@ class TrajectoryRewardDataset(Dataset):
 class FitnessCritic:
     def __init__(self, device: str, model_type: str, loss_fn: int, episode_size: int):
 
-        self.episode_size = episode_size
+        self.episode_size = episode_size + 1
         self.hist = deque(maxlen=30000)
         self.device = device
 
@@ -47,6 +53,8 @@ class FitnessCritic:
         match self.model_type:
             case "MLP":
                 self.model = MLP_Model(loss_fn=loss_fn).to(device)
+            case "ATTENTION":
+                self.model = Attention_Model(loss_fn=loss_fn, device=device, seq_len=self.episode_size).to(device)
 
     def add(self, trajectory, G):
         self.hist.append((trajectory, G))
@@ -59,9 +67,7 @@ class FitnessCritic:
         traj_dataset = None
         loss_arr = []
 
-        match self.model_type:
-            case "MLP":
-                traj_dataset = TrajectoryRewardDataset(self.hist)
+        traj_dataset = TrajectoryRewardDataset(self.hist, self.model_type)
 
         for _ in range(epochs):
 

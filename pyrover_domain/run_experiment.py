@@ -1,9 +1,7 @@
 from pyrover_domain.algorithms.ccea import runCCEA
 import torch.multiprocessing as mp
-from torch import set_grad_enabled
 
 import argparse
-
 
 if __name__ == "__main__":
     # Set for CUDA to allow multiprocessing
@@ -16,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--fitness_critic", default=False, help="use fitness_critic", action="store_true")
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn", type=str)
+    parser.add_argument("--fitness_critic_model", default="mlp", help="mlp/att", type=str)
 
     args = vars(parser.parse_args())
 
@@ -27,12 +26,15 @@ if __name__ == "__main__":
     )
 
     teaming = "_teaming" if args["teaming"] else ""
-    fitness_critic = "_fit_crit" if args["fitness_critic"] else ""
+
+    fit_crit = "_fit_crit" if args["fitness_critic"] else ""
+
+    fit_crit_model = f"_{args['fitness_critic_model']}" if len(args["fitness_critic_model"]) > 0 else ""
 
     # Set configuration file
-    config_dir = f"{config_dir}/{args['poi_type']}_{args['model']}{teaming}{fitness_critic}.yaml"
+    config_dir = f"{config_dir}/{args['poi_type']}_{args['model']}{teaming}{fit_crit}{fit_crit_model}.yaml"
 
-    # config_dir = f"{config_dir}/order_mlp.yaml"
+    # config_dir = f"{config_dir}/static_mlp_fit_crit.yaml"
 
     # Run learning algorithm
     runCCEA(config_dir=config_dir)
