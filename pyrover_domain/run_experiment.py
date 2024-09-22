@@ -27,7 +27,7 @@ if __name__ == "__main__":
     )
 
     teaming = "_teaming" if args["teaming"] else ""
-    fitness_critic = "_fit_crit" if args["teaming"] else ""
+    fitness_critic = "_fit_crit" if args["fitness_critic"] else ""
 
     # Set configuration file
     config_dir = f"{config_dir}/{args['poi_type']}_{args['model']}{teaming}{fitness_critic}.yaml"
