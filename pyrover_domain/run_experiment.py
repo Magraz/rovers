@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--fitness_critic", default=False, help="use fitness_critic", action="store_true")
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn", type=str)
-    parser.add_argument("--fitness_critic_model", default="mlp", help="mlp/att", type=str)
+    parser.add_argument("--fitness_critic_model", default="", help="mlp/att", type=str)
 
     args = vars(parser.parse_args())
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # Set configuration file
     config_dir = f"{config_dir}/{args['poi_type']}_{args['model']}{teaming}{fit_crit}{fit_crit_model}.yaml"
 
-    # config_dir = f"{config_dir}/static_mlp_fit_crit.yaml"
+    # config_dir = f"{config_dir}/static_mlp_fit_crit_att.yaml"
 
     # Run learning algorithm
     runCCEA(config_dir=config_dir)

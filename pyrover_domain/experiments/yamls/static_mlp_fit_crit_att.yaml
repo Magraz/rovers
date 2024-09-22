@@ -1,7 +1,7 @@
 env:
 
   rovers:
-    - observation_radius: 25.0
+    - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
       resolution: 90
@@ -9,7 +9,7 @@ env:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
 
-    - observation_radius: 25.0
+    - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
       resolution: 90
@@ -17,7 +17,7 @@ env:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
     
-    - observation_radius: 25.0
+    - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
       resolution: 90
@@ -25,7 +25,7 @@ env:
         spawn_rule: fixed
         fixed: [25.0, 25.0]
 
-    - observation_radius: 25.0
+    - observation_radius: 1000.0
       reward_type: difference
       sensor_type: lidar
       resolution: 90

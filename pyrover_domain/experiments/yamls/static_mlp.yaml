@@ -66,7 +66,7 @@ teaming:
   team_size: 0
 
 fitness_critic:
-    use_fit_crit: True
+    use_fit_crit: False
     epochs: 10
     type: MLP
     loss_type: MSE #MSE/MAE/MSE+MAE
