@@ -44,7 +44,6 @@ class TrajectoryRewardDataset(Dataset):
 class FitnessCritic:
     def __init__(self, device: str, model_type: str, loss_fn: int, episode_size: int):
 
-        self.episode_size = episode_size + 1
         self.hist = deque(maxlen=30000)
         self.device = device
 
@@ -53,8 +52,11 @@ class FitnessCritic:
         match self.model_type:
             case "MLP":
                 self.model = MLP_Model(loss_fn=loss_fn).to(device)
+                self.batch_size = episode_size + 1
+
             case "ATTENTION":
-                self.model = Attention_Model(loss_fn=loss_fn, device=device, seq_len=self.episode_size).to(device)
+                self.model = Attention_Model(loss_fn=loss_fn, device=device, seq_len=episode_size + 1).to(device)
+                self.batch_size = 1
 
     def add(self, trajectory, G):
         self.hist.append((trajectory, G))
@@ -71,7 +73,7 @@ class FitnessCritic:
 
         for _ in range(epochs):
 
-            dataloader = DataLoader(traj_dataset, batch_size=self.episode_size, shuffle=True, num_workers=0)
+            dataloader = DataLoader(traj_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0)
 
             for x, y in dataloader:
                 loss_arr.append(self.model.train(x.to(self.device), y.to(self.device)))
