@@ -66,14 +66,22 @@ class FitnessCritic:
         return np.max(result)
 
     def train(self, epochs: int):
-        traj_dataset = None
-        loss_arr = []
+
+        avg_loss = []
 
         traj_dataset = TrajectoryRewardDataset(self.hist, self.model_type)
 
         for _ in range(epochs):
 
-            dataloader = DataLoader(traj_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0)
+            accum_loss = 0
+            batches = 0
+
+            dataloader = DataLoader(traj_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0)
 
             for x, y in dataloader:
-                loss_arr.append(self.model.train(x.to(self.device), y.to(self.device)))
+                accum_loss += self.model.train(x.to(self.device), y.to(self.device))
+                batches += 1
+
+            avg_loss.append(accum_loss / batches)
+
+        return np.mean(np.array(avg_loss))

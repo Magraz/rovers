@@ -66,10 +66,10 @@ teaming:
   team_size: 0
 
 fitness_critic:
-    use_fit_crit: False
+    use_fit_crit: True
     epochs: 10
-    type: MLP
-    loss_type: MSE #MSE/MAE/MSE+MAE
+    type: MLP #MLP/ATTENTION
+    loss_type: MSE+MAE #MSE/MAE/MSE+MAE
     hidden_layers: [80, 80]
 
 ccea:
@@ -78,7 +78,7 @@ ccea:
 
   policy:
     type: MLP
-    hidden_layers: [64,64]
+    hidden_layers: [64]
     rover_max_velocity: 1.0
 
   population:
@@ -111,7 +111,7 @@ experiment:
   num_trials: 5
   
 data:
-  num_gens_between_save: 20
+  num_gens_between_save: 50
   load_checkpoint_filename: checkpoint.pickle
   load_checkpoint: False
   save_trajectories: True

@@ -457,6 +457,8 @@ class CooperativeCoevolutionaryAlgorithm:
         fitness_critics: list[FitnessCritic],
         eval_infos: list[EvalInfo],
     ):
+        fit_crit_loss = []
+
         # Collect trajectories from eval_infos
         for eval_info in eval_infos:
             for idx in eval_info.team_formation:
@@ -466,7 +468,10 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Train fitness critics
         for fit_crit in fitness_critics:
-            fit_crit.train(epochs=self.config["fitness_critic"]["epochs"])
+            accum_loss = fit_crit.train(epochs=self.config["fitness_critic"]["epochs"])
+            fit_crit_loss.append(accum_loss)
+
+        return fit_crit_loss
 
     def assignFitnesses(
         self,
@@ -554,6 +559,33 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Now save it all to the csv
         with open(eval_fitness_dir, "a") as file:
+            file.write(fit_str)
+
+    def createFitCritLossCSV(self, trial_dir):
+        fit_crit_loss_dir = f"{trial_dir}/fitness_critic_loss.csv"
+        header = "generation"
+
+        for j in range(self.num_rovers):
+            header += ",loss_" + str(j)
+
+        header += "\n"
+
+        with open(fit_crit_loss_dir, "w") as file:
+            file.write(header)
+
+    def writeFitCritLossCSV(self, trial_dir, fitness_critics_loss):
+        fit_crit_loss_dir = f"{trial_dir}/fitness_critic_loss.csv"
+        gen = str(self.gen)
+
+        fit_str = f"{gen},"
+
+        for loss in fitness_critics_loss:
+            fit_str += f"{str(loss)},"
+
+        fit_str += "\n"
+
+        # Now save it all to the csv
+        with open(fit_crit_loss_dir, "a") as file:
             file.write(fit_str)
 
     def writeEvalTrajs(self, trial_dir, eval_infos):
@@ -673,6 +705,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # Create csv file for saving evaluation fitnesses
                 self.createEvalFitnessCSV(trial_dir)
+                self.createFitCritLossCSV(trial_dir)
 
             # Initialize fitness critics
             loss_fn = 0
@@ -717,7 +750,8 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # Train Fitness Critics
                 if self.use_fit_crit:
-                    self.trainFitnessCritics(fitness_critics, eval_infos)
+                    fit_crit_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
+                    self.writeFitCritLossCSV(trial_dir, fit_crit_loss)
 
                 # Regroup sets of teams with their respective sets of eval_infos
                 grouped_teams, grouped_eval_infos = self.groupTeamsAndEvalInfos(teams, eval_infos)

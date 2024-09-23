@@ -2,9 +2,6 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-from copy import deepcopy
-from collections import deque
-import numpy as np
 
 
 class MLP_Model(nn.Module):  # inheriting from nn.Module!
@@ -61,9 +58,7 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
 
         return loss.cpu().detach().item()
 
-    def alignment_loss(self, o, t, shaping=False):
-        if shaping:
-            o = o + t
+    def alignment_loss(self, o, t):
         ot = torch.transpose(o, 0, 1)
         tt = torch.transpose(t, 0, 1)
 
@@ -71,7 +66,7 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
         T = t - tt
 
         align = torch.mul(O, T)
-        # print(align)
-        align = nn.Sigmoid(align)
+        align = F.sigmoid(align)
         loss = -torch.mean(align)
+
         return loss
