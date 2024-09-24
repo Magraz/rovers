@@ -74,11 +74,11 @@ fitness_critic:
 
 ccea:
 
-  weight_initialization: "kaiming"
+  weight_initialization: kaiming
 
   policy:
     type: MLP
-    hidden_layers: [64,64]
+    hidden_layers: [64, 64]
     rover_max_velocity: 1.0
 
   population:
@@ -87,7 +87,7 @@ ccea:
   evaluation:
 
     multi_evaluation:
-      num_evaluations: 2
+      num_evaluations: 1
       aggregation_method: sum
     
     fitness_method: last_step #aggregate/last_step
@@ -111,7 +111,7 @@ experiment:
   num_trials: 5
   
 data:
-  num_gens_between_save: 20
+  num_gens_between_save: 50
   load_checkpoint_filename: checkpoint.pickle
   load_checkpoint: False
   save_trajectories: True

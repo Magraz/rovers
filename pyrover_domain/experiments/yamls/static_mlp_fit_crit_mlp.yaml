@@ -87,7 +87,7 @@ ccea:
   evaluation:
 
     multi_evaluation:
-      num_evaluations: 2
+      num_evaluations: 1
       aggregation_method: sum
     
     fitness_method: last_step #aggregate/last_step

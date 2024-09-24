@@ -475,7 +475,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def assignFitnesses(
         self,
-        fitness_critics: list[FitnessCritic],
+        fitness_critics,
         grouped_teams: list[list[Team]],
         grouped_eval_infos: list[list[EvalInfo]],
     ):
@@ -705,23 +705,31 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 # Create csv file for saving evaluation fitnesses
                 self.createEvalFitnessCSV(trial_dir)
-                self.createFitCritLossCSV(trial_dir)
+
+                if self.use_fit_crit:
+                    self.createFitCritLossCSV(trial_dir)
 
             # Initialize fitness critics
-            loss_fn = 0
+            fitness_critics = None
 
-            match self.fit_crit_loss_type:
-                case "MSE":
-                    loss_fn = 0
-                case "MAE":
-                    loss_fn = 1
-                case "MSE+MAE":
-                    loss_fn = 2
+            if self.use_fit_crit:
 
-            fitness_critics = [
-                FitnessCritic(device=DEVICE, model_type=self.fit_crit_type, loss_fn=loss_fn, episode_size=self.n_steps)
-                for _ in range(self.num_rovers)
-            ]
+                loss_fn = 0
+
+                match self.fit_crit_loss_type:
+                    case "MSE":
+                        loss_fn = 0
+                    case "MAE":
+                        loss_fn = 1
+                    case "MSE+MAE":
+                        loss_fn = 2
+
+                fitness_critics = [
+                    FitnessCritic(
+                        device=DEVICE, model_type=self.fit_crit_type, loss_fn=loss_fn, episode_size=self.n_steps
+                    )
+                    for _ in range(self.num_rovers)
+                ]
 
             for n_gen in tqdm(range(self.n_gens + 1)):
 
