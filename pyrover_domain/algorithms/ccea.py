@@ -82,9 +82,9 @@ class EvalInfo(object):
 
 
 class CooperativeCoevolutionaryAlgorithm:
-    def __init__(self, config_dir):
+    def __init__(self, config_dir, experiment_name):
         self.config_dir = Path(os.path.expanduser(config_dir))
-        self.trials_dir = f"{Path(self.config_dir).parents[1]}/results"
+        self.trials_dir = os.path.join(self.config_dir.parents[2], "results", experiment_name)
 
         with open(str(self.config_dir), "r") as file:
             self.config = yaml.safe_load(file)
@@ -138,12 +138,10 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Data loading
         self.load_checkpoint = self.config["data"]["load_checkpoint"]
-        self.load_checkpoint_filename = self.config["data"]["load_checkpoint_filename"]
 
         # Data saving variables
-        self.save_trajectories = self.config["data"]["save_trajectories"]
-        self.save_checkpoint = self.config["data"]["save_checkpoint"]
         self.num_gens_between_save = self.config["data"]["num_gens_between_save"]
+        self.trial_to_load = self.config["data"]["trial_to_load"]
 
         # Create the type of fitness we're optimizing
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -675,32 +673,63 @@ class CooperativeCoevolutionaryAlgorithm:
                     # Write it out
                     file.write(csv_line)
 
+    def init_fitness_critics(self):
+        # Initialize fitness critics
+        fitness_critics = None
+
+        if self.use_fit_crit:
+
+            loss_fn = 0
+
+            match self.fit_crit_loss_type:
+                case "MSE":
+                    loss_fn = 0
+                case "MAE":
+                    loss_fn = 1
+                case "MSE+MAE":
+                    loss_fn = 2
+
+            fitness_critics = [
+                FitnessCritic(device=DEVICE, model_type=self.fit_crit_type, loss_fn=loss_fn, episode_size=self.n_steps)
+                for _ in range(self.num_rovers)
+            ]
+
+        return fitness_critics
+
     def run(self):
+
+        checkpoint_loaded = False
 
         for n_trial in range(self.config["experiment"]["num_trials"]):
 
-            # Set trial directory name
-            trial_dir = f"{self.trials_dir}/trial_{str(n_trial)}_{self.trial_name}"
+            # Set trial to load
+            if not checkpoint_loaded and self.load_checkpoint:
+                if n_trial < self.trial_to_load:
+                    continue
+                elif n_trial > self.trial_to_load:
+                    checkpoint_loaded = True
 
-            # Load checkpoint
-            if self.load_checkpoint:
-                with open(f"{trial_dir}/{self.load_checkpoint_filename}", "rb") as handle:
-                    checkpoint = pickle.load(handle)
-                    pop = checkpoint["population"]
-                    self.checkpoint_gen = checkpoint["gen"]
-                    self.checkpoint_trial = checkpoint["trial"]
-                logging.info(f"Loading GEN:{self.checkpoint_gen} TRIAL: {self.checkpoint_trial}")
-            else:
-                logging.info(f"Starting run...")
+            # Set trial directory name
+            trial_folder_name = "_".join(("trial", str(n_trial), self.trial_name))
+            trial_dir = os.path.join(self.trials_dir, trial_folder_name)
+            checkpoint_name = os.path.join(trial_dir, "checkpoint.pickle")
 
             # Create directory for saving data
             if not os.path.isdir(trial_dir):
                 os.makedirs(trial_dir)
 
-            # Initialize the population or load models
-            if self.load_checkpoint and n_trial < self.checkpoint_trial:
-                continue
-            else:
+            # Load checkpoint
+            if not checkpoint_loaded and self.load_checkpoint:
+
+                with open(checkpoint_name, "rb") as handle:
+                    checkpoint = pickle.load(handle)
+                    pop = checkpoint["population"]
+                    self.checkpoint_gen = checkpoint["gen"]
+                    fitness_critics = checkpoint["fitness_critics"]
+
+            # Initialize the population
+            if not self.load_checkpoint:
+
                 pop = self.toolbox.population()
 
                 # Create csv file for saving evaluation fitnesses
@@ -709,27 +738,8 @@ class CooperativeCoevolutionaryAlgorithm:
                 if self.use_fit_crit:
                     self.createFitCritLossCSV(trial_dir)
 
-            # Initialize fitness critics
-            fitness_critics = None
-
-            if self.use_fit_crit:
-
-                loss_fn = 0
-
-                match self.fit_crit_loss_type:
-                    case "MSE":
-                        loss_fn = 0
-                    case "MAE":
-                        loss_fn = 1
-                    case "MSE+MAE":
-                        loss_fn = 2
-
-                fitness_critics = [
-                    FitnessCritic(
-                        device=DEVICE, model_type=self.fit_crit_type, loss_fn=loss_fn, episode_size=self.n_steps
-                    )
-                    for _ in range(self.num_rovers)
-                ]
+                # Init fitness critics
+                fitness_critics = self.init_fitness_critics()
 
             for n_gen in tqdm(range(self.n_gens + 1)):
 
@@ -737,7 +747,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 self.gen = n_gen
 
                 # Get loading bar up to checkpoint
-                if self.load_checkpoint and n_gen <= self.checkpoint_gen:
+                if not checkpoint_loaded and self.load_checkpoint and n_gen <= self.checkpoint_gen:
                     continue
 
                 # Perform selection
@@ -779,22 +789,25 @@ class CooperativeCoevolutionaryAlgorithm:
                 # Save trajectories and checkpoint
                 if n_gen % self.num_gens_between_save == 0:
 
-                    if self.save_trajectories:
-                        # Save trajectories
-                        self.writeEvalTrajs(trial_dir, eval_infos)
+                    # Save trajectories
+                    self.writeEvalTrajs(trial_dir, eval_infos)
 
-                    if self.save_checkpoint:
-                        trial_done = 1 if n_gen == self.n_gens else 0
-                        with open(f"{trial_dir}/{self.load_checkpoint_filename}", "wb") as handle:
-                            pickle.dump(
-                                {"population": pop, "gen": n_gen, "trial": n_trial + trial_done},
-                                handle,
-                                protocol=pickle.HIGHEST_PROTOCOL,
-                            )
+                    # Save checkpoint
+                    with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
+                        pickle.dump(
+                            {
+                                "population": pop,
+                                "gen": n_gen,
+                                "fitness_critics": fitness_critics,
+                            },
+                            handle,
+                            protocol=pickle.HIGHEST_PROTOCOL,
+                        )
+
         if self.use_multiprocessing:
             self.pool.close()
 
 
-def runCCEA(config_dir):
-    ccea = CooperativeCoevolutionaryAlgorithm(config_dir)
+def runCCEA(config_dir, experiment_name):
+    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name)
     return ccea.run()
