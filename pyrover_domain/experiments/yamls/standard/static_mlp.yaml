@@ -100,8 +100,8 @@ ccea:
     independent_probability: 0.5
     std_deviation: 0.05
 
-  num_steps: 5
-  num_generations: 3
+  num_steps: 30
+  num_generations: 5000
 
 processing:
   use_multiprocessing: True
@@ -111,6 +111,6 @@ experiment:
   num_trials: 5
   
 data:
-  num_gens_between_save: 1
-  load_checkpoint: True
-  trial_to_load: 2
+  num_gens_between_save: 100
+  load_checkpoint: False
+  trial_to_load: 0

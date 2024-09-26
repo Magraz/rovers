@@ -36,7 +36,7 @@ env:
   pois:
     - type: static
       value: 4.0
-      observation_radius: 2.5
+      observation_radius: 5
       coupling: 2
       position:
         spawn_rule: fixed
@@ -44,7 +44,7 @@ env:
     
     - type: static
       value: 2.0
-      observation_radius: 2.5
+      observation_radius: 5
       coupling: 2
       position:
         spawn_rule: fixed
@@ -52,7 +52,7 @@ env:
 
     - type: static
       value: 4.0
-      observation_radius: 2.5
+      observation_radius: 5
       coupling: 2
       position:
         spawn_rule: fixed
@@ -74,11 +74,11 @@ fitness_critic:
 
 ccea:
 
-  weight_initialization: "kaiming"
+  weight_initialization: kaiming
 
   policy:
     type: MLP
-    hidden_layers: [64]
+    hidden_layers: [32, 32]
     rover_max_velocity: 1.0
 
   population:
@@ -87,7 +87,7 @@ ccea:
   evaluation:
 
     multi_evaluation:
-      num_evaluations: 2
+      num_evaluations: 3
       aggregation_method: sum
     
     fitness_method: last_step #aggregate/last_step
@@ -105,14 +105,12 @@ ccea:
 
 processing:
   use_multiprocessing: True
-  num_threads: 14
+  num_threads: 12
 
 experiment:
   num_trials: 5
   
 data:
-  num_gens_between_save: 20
-  load_checkpoint_filename: checkpoint.pickle
+  num_gens_between_save: 100
   load_checkpoint: False
-  save_trajectories: True
-  save_checkpoint: True
+  trial_to_load: 0
