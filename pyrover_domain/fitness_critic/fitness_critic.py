@@ -58,6 +58,8 @@ class FitnessCritic:
                 self.model = Attention_Model(loss_fn=loss_fn, device=device, seq_len=episode_size + 1).to(device)
                 self.batch_size = 1
 
+        self.params = self.model.get_params()
+
     def add(self, trajectory, G):
         self.hist.append((trajectory, G))
 

@@ -39,6 +39,9 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
+    def get_params(self):
+        return nn.utils.parameters_to_vector(self.parameters())
+
     def forward(self, x):
         out = F.tanh(self.fc1(x))
 

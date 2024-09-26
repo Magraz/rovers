@@ -798,7 +798,9 @@ class CooperativeCoevolutionaryAlgorithm:
                             {
                                 "population": pop,
                                 "gen": n_gen,
-                                "fitness_critics": fitness_critics,
+                                "fitness_critics": (
+                                    [fit_crit.params for fit_crit in fitness_critics] if self.use_fit_crit else None
+                                ),
                             },
                             handle,
                             protocol=pickle.HIGHEST_PROTOCOL,

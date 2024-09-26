@@ -71,6 +71,9 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
+    def get_params(self):
+        return nn.utils.parameters_to_vector(self.parameters())
+
     def forward(self, x: torch.Tensor):
 
         KQV = self.w1(x + self.pos_enc)
