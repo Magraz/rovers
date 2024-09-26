@@ -68,7 +68,7 @@ teaming:
 fitness_critic:
     use_fit_crit: True
     epochs: 10
-    type: ATTENTION #MLP/ATTENTION
+    type: GRU #MLP/ATTENTION
     loss_type: MSE+MAE #MSE/MAE/MSE+MAE
     hidden_layers: [80, 80]
 

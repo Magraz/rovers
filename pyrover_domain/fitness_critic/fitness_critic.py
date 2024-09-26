@@ -2,9 +2,12 @@ from collections import deque
 import numpy as np
 from random import sample
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from pyrover_domain.fitness_critic.models.mlp import MLP_Model
 from pyrover_domain.fitness_critic.models.attention import Attention_Model
+from pyrover_domain.fitness_critic.models.gru import GRU_Model
+from pyrover_domain.utils.loss_functions import alignment_loss
 
 
 class TrajectoryRewardDataset(Dataset):
@@ -19,12 +22,15 @@ class TrajectoryRewardDataset(Dataset):
         self.observations, self.reward = [], []
 
         for traj, g in trajG:
+
             match model_type:
+
                 case "MLP":
                     for s in traj:  # train whole trajectory
                         self.observations.append(s)
                         self.reward.append([g])
-                case "ATTENTION":
+
+                case "ATTENTION" | "GRU":
                     self.observations.append(traj)
                     self.reward.append([g])
 
@@ -49,13 +55,26 @@ class FitnessCritic:
 
         self.model_type = model_type
 
+        # Set loss function
+        if loss_fn == 0:
+            self.loss_func = nn.MSELoss(reduction="sum")
+        elif loss_fn == 1:
+            self.loss_func = alignment_loss
+        elif loss_fn == 2:
+            self.loss_func = lambda x, y: alignment_loss(x, y) + nn.MSELoss(reduction="sum")(x, y)
+
+        # Set model type
         match self.model_type:
             case "MLP":
-                self.model = MLP_Model(loss_fn=loss_fn).to(device)
+                self.model = MLP_Model(loss_func=self.loss_func).to(device)
                 self.batch_size = episode_size + 1
 
             case "ATTENTION":
-                self.model = Attention_Model(loss_fn=loss_fn, device=device, seq_len=episode_size + 1).to(device)
+                self.model = Attention_Model(loss_func=self.loss_func, device=device, seq_len=episode_size + 1)
+                self.batch_size = 1
+
+            case "GRU":
+                self.model = GRU_Model(loss_func=self.loss_func).to(device)
                 self.batch_size = 1
 
         self.params = self.model.get_params()

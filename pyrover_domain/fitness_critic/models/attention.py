@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
+from pyrover_domain.utils.loss_functions import alignment_loss
+
 
 def scaled_dot_product_attention(
     query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, device: str
@@ -39,8 +41,8 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
 
     def __init__(
         self,
+        loss_func,
         device: str,
-        loss_fn: int,
         seq_len: int,
         in_dim: int = 8,
         hid_dim: int = 50,
@@ -50,24 +52,19 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
 
         self.device = device
 
+        self.loss_func = loss_func
+
         self.w1 = nn.Linear(in_dim, hid_dim)
 
         self.w_out1 = nn.Linear(hid_dim, hid_dim)
         self.w_out2 = nn.Linear(hid_dim, 1)
         self.w_out3 = nn.Linear(seq_len, 1)
 
+        self.double()
+        self.to(device)
+
         self.pos_enc = getPositionEncoding(seq_len, in_dim)
         self.pos_enc = torch.from_numpy(self.pos_enc.astype(np.float64)).to(self.device)
-
-        self.to(torch.double)
-
-        # Set loss function
-        if loss_fn == 0:
-            self.loss_func = nn.MSELoss(reduction="sum")
-        elif loss_fn == 1:
-            self.loss_func = self.alignment_loss
-        elif loss_fn == 2:
-            self.loss_func = lambda x, y: self.alignment_loss(x, y) + nn.MSELoss(reduction="sum")(x, y)
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
@@ -77,7 +74,7 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
     def forward(self, x: torch.Tensor):
 
         KQV = self.w1(x + self.pos_enc)
-        res, attn = scaled_dot_product_attention(KQV, KQV, KQV, self.device)
+        res = F.scaled_dot_product_attention(KQV, KQV, KQV)
         transformout = self.w_out2(F.leaky_relu(self.w_out1(res)))
         transformout = torch.flatten(transformout, start_dim=-2, end_dim=-1)
 
@@ -92,17 +89,3 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
         self.optimizer.step()
 
         return loss.cpu().detach().item()
-
-    def alignment_loss(self, o, t):
-
-        ot = torch.transpose(o, 0, 1)
-        tt = torch.transpose(t, 0, 1)
-
-        O = o - ot
-        T = t - tt
-
-        align = torch.mul(O, T)
-        align = F.sigmoid(align)
-        loss = -torch.mean(align)
-
-        return loss

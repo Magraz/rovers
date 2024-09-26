@@ -2,13 +2,14 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
+from pyrover_domain.utils.loss_functions import alignment_loss
 
 
 class MLP_Model(nn.Module):  # inheriting from nn.Module!
 
     def __init__(
         self,
-        loss_fn: int,
+        loss_func,
         input_size: int = 8,
         hidden_layers: int = 2,
         hidden_size: int = 80,
@@ -17,6 +18,8 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
         super(MLP_Model, self).__init__()
 
         self.hidden_layers = hidden_layers
+
+        self.loss_func = loss_func
 
         match (self.hidden_layers):
             case 1:
@@ -27,22 +30,14 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
 
         self.output = nn.Linear(hidden_size, 1)
 
-        self.to(torch.double)
-
-        # Set loss function
-        if loss_fn == 0:
-            self.loss_func = nn.MSELoss(reduction="sum")
-        elif loss_fn == 1:
-            self.loss_func = self.alignment_loss
-        elif loss_fn == 2:
-            self.loss_func = lambda x, y: self.alignment_loss(x, y) + nn.MSELoss(reduction="sum")(x, y)
+        self.double()
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
     def get_params(self):
         return nn.utils.parameters_to_vector(self.parameters())
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         out = F.tanh(self.fc1(x))
 
         match (self.hidden_layers):
@@ -51,7 +46,7 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
 
         return self.output(out)
 
-    def train(self, x, y, shaping=False):
+    def train(self, x: torch.Tensor, y: torch.Tensor):
 
         self.optimizer.zero_grad()
         pred = self.forward(x)
@@ -60,16 +55,3 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
         self.optimizer.step()
 
         return loss.cpu().detach().item()
-
-    def alignment_loss(self, o, t):
-        ot = torch.transpose(o, 0, 1)
-        tt = torch.transpose(t, 0, 1)
-
-        O = o - ot
-        T = t - tt
-
-        align = torch.mul(O, T)
-        align = F.sigmoid(align)
-        loss = -torch.mean(align)
-
-        return loss

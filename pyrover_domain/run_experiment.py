@@ -26,8 +26,9 @@ if __name__ == "__main__":
     config_dir = os.path.join(dir_path, "experiments", "yamls", args["experiment_type"])
 
     # Set configuration file
-    filename = "_".join((args["poi_type"], args["model"])) + ".yaml"
-    config_dir = os.path.join(config_dir, filename)
+    experiment_name = "_".join((args["experiment_type"], args["poi_type"], args["model"]))
+    yaml_filename = "_".join((args["poi_type"], args["model"])) + ".yaml"
+    config_dir = os.path.join(config_dir, yaml_filename)
 
     # Run learning algorithm
-    runCCEA(config_dir=config_dir, experiment_name="_".join((args["experiment_type"], args["poi_type"], args["model"])))
+    runCCEA(config_dir=config_dir, experiment_name=experiment_name)
