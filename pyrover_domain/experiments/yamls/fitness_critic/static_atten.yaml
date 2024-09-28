@@ -67,10 +67,10 @@ teaming:
 
 fitness_critic:
     use_fit_crit: True
-    epochs: 10
+    epochs: 1
     type: ATTENTION #MLP/ATTENTION
     loss_type: MSE+MAE #MSE/MAE/MSE+MAE
-    hidden_layers: [80, 80]
+    hidden_layers: [90]
 
 ccea:
 
@@ -105,10 +105,10 @@ ccea:
 
 processing:
   use_multiprocessing: True
-  num_threads: 12
+  num_threads: 8
 
 experiment:
-  num_trials: 5
+  num_trials: 10
   
 data:
   num_gens_between_save: 100

@@ -690,7 +690,14 @@ class CooperativeCoevolutionaryAlgorithm:
                     loss_fn = 2
 
             fitness_critics = [
-                FitnessCritic(device=DEVICE, model_type=self.fit_crit_type, loss_fn=loss_fn, episode_size=self.n_steps)
+                FitnessCritic(
+                    device=DEVICE,
+                    model_type=self.fit_crit_type,
+                    loss_fn=loss_fn,
+                    episode_size=self.n_steps,
+                    hidden_size=self.fit_crit_num_hidden,
+                    n_layers=len(self.fit_crit_num_hidden),
+                )
                 for _ in range(self.num_rovers)
             ]
 

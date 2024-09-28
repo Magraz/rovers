@@ -45,7 +45,7 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
         device: str,
         seq_len: int,
         in_dim: int = 8,
-        hid_dim: int = 50,
+        hid_dim: int = 90,
         lr: float = 1e-3,
     ):
         super(Attention_Model, self).__init__()
@@ -68,6 +68,8 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
+        self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
+
     def get_params(self):
         return nn.utils.parameters_to_vector(self.parameters())
 
@@ -89,3 +91,11 @@ class Attention_Model(nn.Module):  # inheriting from nn.Module!
         self.optimizer.step()
 
         return loss.cpu().detach().item()
+
+
+if __name__ == "__main__":
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = Attention_Model(loss_func=2, device=device, seq_len=31)
+
+    print(model.num_params)

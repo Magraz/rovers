@@ -48,7 +48,7 @@ class TrajectoryRewardDataset(Dataset):
 
 
 class FitnessCritic:
-    def __init__(self, device: str, model_type: str, loss_fn: int, episode_size: int):
+    def __init__(self, device: str, model_type: str, loss_fn: int, episode_size: int, hidden_size: int, n_layers: int):
 
         self.hist = deque(maxlen=30000)
         self.device = device

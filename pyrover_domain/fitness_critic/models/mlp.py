@@ -10,29 +10,31 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
     def __init__(
         self,
         loss_func,
-        input_size: int = 8,
-        hidden_layers: int = 2,
-        hidden_size: int = 80,
+        in_dim: int = 8,
+        n_layers: int = 2,
+        hid_dim: int = 90,
         lr: float = 1e-3,
     ):
         super(MLP_Model, self).__init__()
 
-        self.hidden_layers = hidden_layers
+        self.hidden_layers = n_layers
 
         self.loss_func = loss_func
 
         match (self.hidden_layers):
             case 1:
-                self.fc1 = nn.Linear(input_size, hidden_size)
+                self.fc1 = nn.Linear(in_dim, hid_dim)
             case 2:
-                self.fc1 = nn.Linear(input_size, hidden_size)
-                self.fc2 = nn.Linear(hidden_size, hidden_size)
+                self.fc1 = nn.Linear(in_dim, hid_dim)
+                self.fc2 = nn.Linear(hid_dim, hid_dim)
 
-        self.output = nn.Linear(hidden_size, 1)
+        self.output = nn.Linear(hid_dim, 1)
 
         self.double()
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
+
+        self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
 
     def get_params(self):
         return nn.utils.parameters_to_vector(self.parameters())
@@ -55,3 +57,11 @@ class MLP_Model(nn.Module):  # inheriting from nn.Module!
         self.optimizer.step()
 
         return loss.cpu().detach().item()
+
+
+if __name__ == "__main__":
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = MLP_Model(loss_func=2).to(device)
+
+    print(model.num_params)

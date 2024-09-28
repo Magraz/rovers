@@ -24,6 +24,8 @@ class GRU_Model(nn.Module):  # inheriting from nn.Module!
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
+        self.num_params = nn.utils.parameters_to_vector(self.parameters()).size()[0]
+
     def get_params(self):
         return nn.utils.parameters_to_vector(self.parameters())
 
@@ -42,3 +44,11 @@ class GRU_Model(nn.Module):  # inheriting from nn.Module!
         self.optimizer.step()
 
         return loss.cpu().detach().item()
+
+
+if __name__ == "__main__":
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = GRU_Model(loss_func=2).to(device)
+
+    print(model.num_params)
