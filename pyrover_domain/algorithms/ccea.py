@@ -1,7 +1,6 @@
 from deap import base
 from deap import creator
 from deap import tools
-from tqdm import tqdm
 import torch
 
 import torch.multiprocessing as mp
@@ -22,8 +21,6 @@ from pathlib import Path
 import yaml
 import logging
 import pickle
-
-import uuid
 
 from itertools import combinations
 
@@ -82,7 +79,9 @@ class EvalInfo(object):
 
 
 class CooperativeCoevolutionaryAlgorithm:
-    def __init__(self, config_dir, experiment_name):
+    def __init__(self, config_dir, experiment_name: str, trial_id: int):
+
+        self.trial_id = trial_id
         self.config_dir = Path(os.path.expanduser(config_dir))
         self.trials_dir = os.path.join(self.config_dir.parents[2], "results", experiment_name)
 
@@ -141,7 +140,6 @@ class CooperativeCoevolutionaryAlgorithm:
 
         # Data saving variables
         self.num_gens_between_save = self.config["data"]["num_gens_between_save"]
-        self.trial_to_load = self.config["data"]["trial_to_load"]
 
         # Create the type of fitness we're optimizing
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -410,6 +408,20 @@ class CooperativeCoevolutionaryAlgorithm:
             for subpop in population:
                 self.mutateIndividual(subpop[mutant_idx])
                 subpop[mutant_idx].fitness.values = (np.float64(0.0),)
+
+    # def selEpsilon(self, individuals: list[creator.Individual], k: int, epsilon: float):
+    #     selected_individuals = []
+
+    #     best_individuals = tools.selBest(individuals, k)
+
+    #     for i in range(k):
+    #         select_best = np.random.choice([True, False], 1, p=[1 - epsilon, epsilon])
+    #         if select_best:
+    #             selected_individuals.append(best_individuals[i])
+    #         else:
+    #             selected_individuals.append(random.sample(selected_individuals))
+
+    #     return selected_individuals
 
     def selectSubPopulation(self, subpopulation):
         # Get the best N individuals
@@ -705,118 +717,107 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def run(self):
 
-        checkpoint_loaded = False
+        # Set trial directory name
+        trial_folder_name = "_".join(("trial", str(self.trial_id), self.trial_name))
+        trial_dir = os.path.join(self.trials_dir, trial_folder_name)
+        checkpoint_name = os.path.join(trial_dir, "checkpoint.pickle")
 
-        for n_trial in range(self.config["experiment"]["num_trials"]):
+        # Create directory for saving data
+        if not os.path.isdir(trial_dir):
+            os.makedirs(trial_dir)
 
-            # Set trial to load
-            if not checkpoint_loaded and self.load_checkpoint:
-                if n_trial < self.trial_to_load:
-                    continue
-                elif n_trial > self.trial_to_load:
-                    checkpoint_loaded = True
+        # Load checkpoint
+        if self.load_checkpoint:
 
-            # Set trial directory name
-            trial_folder_name = "_".join(("trial", str(n_trial), self.trial_name))
-            trial_dir = os.path.join(self.trials_dir, trial_folder_name)
-            checkpoint_name = os.path.join(trial_dir, "checkpoint.pickle")
+            with open(checkpoint_name, "rb") as handle:
+                checkpoint = pickle.load(handle)
+                pop = checkpoint["population"]
+                self.checkpoint_gen = checkpoint["gen"]
+                fitness_critics = checkpoint["fitness_critics"]
 
-            # Create directory for saving data
-            if not os.path.isdir(trial_dir):
-                os.makedirs(trial_dir)
+        # Initialize the population
+        else:
 
-            # Load checkpoint
-            if not checkpoint_loaded and self.load_checkpoint:
+            pop = self.toolbox.population()
 
-                with open(checkpoint_name, "rb") as handle:
-                    checkpoint = pickle.load(handle)
-                    pop = checkpoint["population"]
-                    self.checkpoint_gen = checkpoint["gen"]
-                    fitness_critics = checkpoint["fitness_critics"]
+            # Create csv file for saving evaluation fitnesses
+            self.createEvalFitnessCSV(trial_dir)
 
-            # Initialize the population
-            if not self.load_checkpoint:
+            if self.use_fit_crit:
+                self.createFitCritLossCSV(trial_dir)
 
-                pop = self.toolbox.population()
+            # Init fitness critics
+            fitness_critics = self.init_fitness_critics()
 
-                # Create csv file for saving evaluation fitnesses
-                self.createEvalFitnessCSV(trial_dir)
+        for n_gen in range(self.n_gens + 1):
 
-                if self.use_fit_crit:
-                    self.createFitCritLossCSV(trial_dir)
+            # Set gen counter global var
+            self.gen = n_gen
 
-                # Init fitness critics
-                fitness_critics = self.init_fitness_critics()
+            # Get loading bar up to checkpoint
+            if self.load_checkpoint and n_gen <= self.checkpoint_gen:
+                continue
 
-            for n_gen in tqdm(range(self.n_gens + 1)):
+            # Perform selection
+            offspring = self.select(pop)
 
-                # Set gen counter global var
-                self.gen = n_gen
+            # Perform mutation
+            self.mutate(offspring)
 
-                # Get loading bar up to checkpoint
-                if not checkpoint_loaded and self.load_checkpoint and n_gen <= self.checkpoint_gen:
-                    continue
+            # Shuffle subpopulations in offspring
+            # to make teams random
+            self.shuffle(offspring)
 
-                # Perform selection
-                offspring = self.select(pop)
+            # Form teams for evaluation
+            teams = self.formTeams(offspring)
 
-                # Perform mutation
-                self.mutate(offspring)
+            # Evaluate each team
+            eval_infos = self.evaluateTeams(teams)
 
-                # Shuffle subpopulations in offspring
-                # to make teams random
-                self.shuffle(offspring)
+            # Train Fitness Critics
+            if self.use_fit_crit:
+                fit_crit_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
+                self.writeFitCritLossCSV(trial_dir, fit_crit_loss)
 
-                # Form teams for evaluation
-                teams = self.formTeams(offspring)
+            # Regroup sets of teams with their respective sets of eval_infos
+            grouped_teams, grouped_eval_infos = self.groupTeamsAndEvalInfos(teams, eval_infos)
 
-                # Evaluate each team
-                eval_infos = self.evaluateTeams(teams)
+            # Now assign fitnesses to each individual
+            self.assignFitnesses(fitness_critics, grouped_teams, grouped_eval_infos)
 
-                # Train Fitness Critics
-                if self.use_fit_crit:
-                    fit_crit_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
-                    self.writeFitCritLossCSV(trial_dir, fit_crit_loss)
+            # Evaluate a team with the best individual from each subpopulation
+            eval_infos = self.evaluateBestTeam(offspring)
 
-                # Regroup sets of teams with their respective sets of eval_infos
-                grouped_teams, grouped_eval_infos = self.groupTeamsAndEvalInfos(teams, eval_infos)
+            # Now populate the population with individuals from the offspring
+            self.setPopulation(pop, offspring)
 
-                # Now assign fitnesses to each individual
-                self.assignFitnesses(fitness_critics, grouped_teams, grouped_eval_infos)
+            # Save fitnesses
+            self.writeEvalFitnessCSV(trial_dir, eval_infos)
 
-                # Evaluate a team with the best individual from each subpopulation
-                eval_infos = self.evaluateBestTeam(offspring)
+            # Save trajectories and checkpoint
+            if n_gen % self.num_gens_between_save == 0:
 
-                # Now populate the population with individuals from the offspring
-                self.setPopulation(pop, offspring)
+                # Save trajectories
+                self.writeEvalTrajs(trial_dir, eval_infos)
 
-                # Save fitnesses
-                self.writeEvalFitnessCSV(trial_dir, eval_infos)
-
-                # Save trajectories and checkpoint
-                if n_gen % self.num_gens_between_save == 0:
-
-                    # Save trajectories
-                    self.writeEvalTrajs(trial_dir, eval_infos)
-
-                    # Save checkpoint
-                    with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
-                        pickle.dump(
-                            {
-                                "population": pop,
-                                "gen": n_gen,
-                                "fitness_critics": (
-                                    [fit_crit.params for fit_crit in fitness_critics] if self.use_fit_crit else None
-                                ),
-                            },
-                            handle,
-                            protocol=pickle.HIGHEST_PROTOCOL,
-                        )
+                # Save checkpoint
+                with open(os.path.join(trial_dir, "checkpoint.pickle"), "wb") as handle:
+                    pickle.dump(
+                        {
+                            "population": pop,
+                            "gen": n_gen,
+                            "fitness_critics": (
+                                [fit_crit.params for fit_crit in fitness_critics] if self.use_fit_crit else None
+                            ),
+                        },
+                        handle,
+                        protocol=pickle.HIGHEST_PROTOCOL,
+                    )
 
         if self.use_multiprocessing:
             self.pool.close()
 
 
-def runCCEA(config_dir, experiment_name):
-    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name)
+def runCCEA(config_dir, experiment_name: str, trial_id: int):
+    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name, trial_id)
     return ccea.run()

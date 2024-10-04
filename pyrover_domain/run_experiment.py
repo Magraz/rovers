@@ -14,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn/att", type=str)
     parser.add_argument("--experiment_type", default="", help="standard/fitness_critic/teaming", type=str)
+    parser.add_argument("--trial_id", default=0, help="Sets trial ID", type=int)
 
     args = vars(parser.parse_args())
 
@@ -31,4 +32,4 @@ if __name__ == "__main__":
     config_dir = os.path.join(config_dir, yaml_filename)
 
     # Run learning algorithm
-    runCCEA(config_dir=config_dir, experiment_name=experiment_name)
+    runCCEA(config_dir=config_dir, experiment_name=experiment_name, trial_id=args["trial_id"])
