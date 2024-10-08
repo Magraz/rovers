@@ -42,7 +42,12 @@ for s in range(config["ccea"]["num_steps"]):
     for i, poi in enumerate(env.pois()):
         pack = rovers.EntityPack(entity=poi, agents=env.rovers(), entities=env.pois())
 
-        print(f"{s} POI: {i}, ORDER: {poi.order}, SATISFIED: {poi.constraint_satisfied(pack)} VAL: {poi.value()}\n")
+        print(
+            f"|{s} POI: {i}, ORDER: {poi.order}, SATISFIED: {poi.constraint_satisfied(pack)} VAL: {poi.value()}|",
+            end=" ",
+        )
+
+    print("\n")
 
     radius = 21
 
