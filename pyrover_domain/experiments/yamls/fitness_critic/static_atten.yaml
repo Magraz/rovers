@@ -106,11 +106,7 @@ ccea:
 processing:
   use_multiprocessing: True
   num_threads: 8
-
-experiment:
-  num_trials: 10
   
 data:
   num_gens_between_save: 100
   load_checkpoint: False
-  trial_to_load: 0
