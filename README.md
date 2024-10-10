@@ -14,11 +14,11 @@ Run the following command for running experiments with all default values:
 
 Run the following command for running experiments in different modalities:
 
-- `python3 pyrover_domain/run_experiment.py --experiment_type=fitness_critic --poi_type static --model mlp`
+- `python3 pyrover_domain/run_experiment.py --experiment_type=fitness_critic --poi_type static --model mlp --trial_id=N`
 
 Run N number of trials in parallel (Requires GNU Parallel Package)
 
-- `parallel ./pyrover_domain/experiments/scripts/run_trial.sh ::: $(seq N)`
+- `parallel ./pyrover_domain/experiments/scripts/run_trial.sh ::: $(seq 0 N)`
 
 
 

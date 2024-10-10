@@ -94,11 +94,7 @@ ccea:
     subpopulation_size: 50
 
   evaluation:
-
-    multi_evaluation:
-      num_evaluations: 3
-      aggregation_method: sum
-
+    num_evaluations: 3
     fitness_method: aggregate #aggregate/last_step
 
   selection:
@@ -106,7 +102,6 @@ ccea:
 
   mutation:
     mean: 1.0
-    independent_probability: 0.5
     std_deviation: 0.05
 
   num_steps: 100
@@ -118,4 +113,3 @@ processing:
 
 data:
   num_gens_between_save: 100
-  load_checkpoint: False

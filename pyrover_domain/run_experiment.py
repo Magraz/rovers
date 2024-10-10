@@ -11,6 +11,7 @@ if __name__ == "__main__":
     # Arg parser variables
     parser = argparse.ArgumentParser()
     parser.add_argument("--hpc", default=False, help="use hpc config files", action="store_true")
+    parser.add_argument("--load_checkpoint", default=False, help="loads checkpoint", action="store_true")
     parser.add_argument("--poi_type", default="static", help="static/decay", type=str)
     parser.add_argument("--model", default="mlp", help="mlp/gru/cnn/att", type=str)
     parser.add_argument("--experiment_type", default="", help="standard/fitness_critic/teaming", type=str)
@@ -32,4 +33,4 @@ if __name__ == "__main__":
     config_dir = os.path.join(config_dir, yaml_filename)
 
     # Run learning algorithm
-    runCCEA(config_dir=config_dir, experiment_name=experiment_name, trial_id=args["trial_id"])
+    runCCEA(config_dir=config_dir, experiment_name=experiment_name, trial_id=args["trial_id"], load_checkpoint=args["load_checkpoint"])

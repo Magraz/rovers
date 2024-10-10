@@ -21,6 +21,7 @@ from pathlib import Path
 import yaml
 import logging
 import pickle
+import csv
 
 from itertools import combinations
 
@@ -79,7 +80,7 @@ class EvalInfo(object):
 
 
 class CooperativeCoevolutionaryAlgorithm:
-    def __init__(self, config_dir, experiment_name: str, trial_id: int):
+    def __init__(self, config_dir, experiment_name: str, trial_id: int, load_checkpoint: bool):
 
         self.trial_id = trial_id
         self.config_dir = Path(os.path.expanduser(config_dir))
@@ -97,7 +98,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.use_fc = self.config["fitness_critic"]["use_fit_crit"]
         self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
 
-        self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
+        self.n_eval_per_team = self.config["ccea"]["evaluation"]["num_evaluations"]
         self.team_size = self.config["teaming"]["team_size"] if self.use_teaming else self.num_rovers
         self.team_combinations = [combo for combo in combinations(range(self.num_rovers), self.team_size)]
 
@@ -122,7 +123,6 @@ class CooperativeCoevolutionaryAlgorithm:
         self.n_elites = round(self.config["ccea"]["selection"]["n_elites"] * self.subpopulation_size)
         self.n_mutants = self.subpopulation_size - self.n_elites
 
-        self.aggregation_method = self.config["ccea"]["evaluation"]["multi_evaluation"]["aggregation_method"]
         self.fitness_method = self.config["ccea"]["evaluation"]["fitness_method"]
 
         self.n_steps = self.config["ccea"]["num_steps"]
@@ -136,7 +136,7 @@ class CooperativeCoevolutionaryAlgorithm:
         self.num_threads = self.config["processing"]["num_threads"]
 
         # Data loading
-        self.load_checkpoint = self.config["data"]["load_checkpoint"]
+        self.load_checkpoint = load_checkpoint
 
         # Data saving variables
         self.num_gens_between_save = self.config["data"]["num_gens_between_save"]
@@ -523,8 +523,7 @@ class CooperativeCoevolutionaryAlgorithm:
         for subpop, subpop_offspring in zip(population, offspring):
             subpop[:] = subpop_offspring
 
-    def createEvalFitnessCSV(self, trial_dir):
-        eval_fitness_dir = f"{trial_dir}/fitness.csv"
+    def createEvalFitnessCSV(self, eval_fit_dir):
         header = "generation,team_fitness_aggregated"
         for j in range(self.num_rovers):
             header += ",rover_" + str(j)
@@ -535,11 +534,10 @@ class CooperativeCoevolutionaryAlgorithm:
                 header += ",team_" + str(i) + "_rover_" + str(j)
 
         header += "\n"
-        with open(eval_fitness_dir, "w") as file:
+        with open(eval_fit_dir, "w") as file:
             file.write(header)
 
-    def writeEvalFitnessCSV(self, trial_dir, eval_infos):
-        eval_fitness_dir = f"{trial_dir}/fitness.csv"
+    def writeEvalFitnessCSV(self, eval_fit_dir, eval_infos):
         gen = str(self.gen)
 
         # Aggergate the fitnesses into a big numpy array
@@ -570,7 +568,7 @@ class CooperativeCoevolutionaryAlgorithm:
         fit_str += "\n"
 
         # Now save it all to the csv
-        with open(eval_fitness_dir, "a") as file:
+        with open(eval_fit_dir, "a") as file:
             file.write(fit_str)
 
     def createFitCritLossCSV(self, trial_dir):
@@ -722,6 +720,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Set trial directory name
         trial_folder_name = "_".join(("trial", str(self.trial_id), self.trial_name))
         trial_dir = os.path.join(self.trials_dir, trial_folder_name)
+        eval_fit_dir = f"{trial_dir}/fitness.csv"
         checkpoint_name = os.path.join(trial_dir, "checkpoint.pickle")
 
         # Create directory for saving data
@@ -735,22 +734,39 @@ class CooperativeCoevolutionaryAlgorithm:
                 checkpoint = pickle.load(handle)
                 pop = checkpoint["population"]
                 self.checkpoint_gen = checkpoint["gen"]
-                fitness_critics_params = checkpoint["fitness_critics"]
+                fc_params = checkpoint["fitness_critics"]
             
             #Load fitness critics params
             if self.use_fc:
                 fitness_critics = self.init_fitness_critics()
-                for fc in fitness_critics:
-                    fc.model.set_params(fitness_critics_params)
+                for fc, params in zip(fitness_critics, fc_params):
+                    fc.model.set_params(params)
             else: 
                 fitness_critics = None
+            
+            #Set fitness csv file to checkpoint
+            new_fit_path = os.path.join(trial_dir, "fitness_edit.csv")
+            with open(eval_fit_dir, 'r') as inp, open(new_fit_path, 'w') as out:
+                writer = csv.writer(out)
+                for row in csv.reader(inp):
+                    if row[0].isdigit():
+                        gen = int(row[0])
+                        if gen <= self.checkpoint_gen:
+                            writer.writerow(row)
+                    else:
+                        writer.writerow(row)
+
+            #Remove old fitness file
+            os.remove(eval_fit_dir)
+            #Rename new fitness file
+            os.rename(new_fit_path, eval_fit_dir)
 
         else:
             # Initialize the population
             pop = self.toolbox.population()
 
             # Create csv file for saving evaluation fitnesses
-            self.createEvalFitnessCSV(trial_dir)
+            self.createEvalFitnessCSV(eval_fit_dir)
 
             # Create csv file for saving fitness critic losses
             self.createFitCritLossCSV(trial_dir)
@@ -805,7 +821,7 @@ class CooperativeCoevolutionaryAlgorithm:
             self.setPopulation(pop, offspring)
 
             # Save fitnesses
-            self.writeEvalFitnessCSV(trial_dir, eval_infos)
+            self.writeEvalFitnessCSV(eval_fit_dir, eval_infos)
 
             # Save trajectories and checkpoint
             if n_gen % self.num_gens_between_save == 0:
@@ -831,6 +847,6 @@ class CooperativeCoevolutionaryAlgorithm:
             self.pool.close()
 
 
-def runCCEA(config_dir, experiment_name: str, trial_id: int):
-    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name, trial_id)
+def runCCEA(config_dir, experiment_name: str, trial_id: int, load_checkpoint: bool):
+    ccea = CooperativeCoevolutionaryAlgorithm(config_dir, experiment_name, trial_id, load_checkpoint)
     return ccea.run()
