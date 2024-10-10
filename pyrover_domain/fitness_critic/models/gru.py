@@ -29,6 +29,9 @@ class GRU_Model(nn.Module):  # inheriting from nn.Module!
     def get_params(self):
         return nn.utils.parameters_to_vector(self.parameters())
 
+    def set_params(self, params: torch.Tensor):
+        nn.utils.vector_to_parameters(params, self.parameters())
+
     def forward(self, x: torch.Tensor):
 
         self.rnn.flatten_parameters()

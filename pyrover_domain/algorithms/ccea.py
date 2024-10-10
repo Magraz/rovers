@@ -94,7 +94,7 @@ class CooperativeCoevolutionaryAlgorithm:
         # Start by setting up variables for different agents
         self.num_rovers = len(self.config["env"]["rovers"])
         self.use_teaming = self.config["teaming"]["use_teaming"]
-        self.use_fit_crit = self.config["fitness_critic"]["use_fit_crit"]
+        self.use_fc = self.config["fitness_critic"]["use_fit_crit"]
         self.fit_crit_loss_type = self.config["fitness_critic"]["loss_type"]
 
         self.n_eval_per_team = self.config["ccea"]["evaluation"]["multi_evaluation"]["num_evaluations"]
@@ -467,7 +467,7 @@ class CooperativeCoevolutionaryAlgorithm:
         fitness_critics: list[FitnessCritic],
         eval_infos: list[EvalInfo],
     ):
-        fit_crit_loss = []
+        fc_loss = []
 
         # Collect trajectories from eval_infos
         for eval_info in eval_infos:
@@ -477,11 +477,11 @@ class CooperativeCoevolutionaryAlgorithm:
                 )
 
         # Train fitness critics
-        for fit_crit in fitness_critics:
-            accum_loss = fit_crit.train(epochs=self.config["fitness_critic"]["epochs"])
-            fit_crit_loss.append(accum_loss)
+        for fc in fitness_critics:
+            accum_loss = fc.train(epochs=self.config["fitness_critic"]["epochs"])
+            fc_loss.append(accum_loss)
 
-        return fit_crit_loss
+        return fc_loss
 
     def assignFitnesses(
         self,
@@ -501,7 +501,7 @@ class CooperativeCoevolutionaryAlgorithm:
 
                 for idx, fit in eval_info.agent_fitnesses:
 
-                    if self.use_fit_crit:
+                    if self.use_fc:
                         accumulated_fitnesses[idx] += fitness_critics[idx].evaluate(
                             eval_info.joint_traj.observations[:, idx, :]
                         )
@@ -546,10 +546,12 @@ class CooperativeCoevolutionaryAlgorithm:
         num_ind_per_team = self.num_rovers + 1  # +1 to include team fitness
         all_fit = np.zeros(shape=(self.n_eval_per_team_set, num_ind_per_team))
 
-        for num_eval, eval_info in enumerate(eval_infos):
-            for fit in eval_info.agent_fitnesses:
-                all_fit[num_eval, fit[0]] = fit[1]
-            all_fit[num_eval, -1] = eval_info.team_fitness
+        for n_eval, eval_info in enumerate(eval_infos):
+
+            for idx, fit in eval_info.agent_fitnesses:
+                all_fit[n_eval, idx] = fit
+
+            all_fit[n_eval, -1] = eval_info.team_fitness
 
         # Now compute a sum/average/min/etc dependending on what config specifies
         agg_fit = np.average(all_fit, axis=0)
@@ -687,9 +689,9 @@ class CooperativeCoevolutionaryAlgorithm:
 
     def init_fitness_critics(self):
         # Initialize fitness critics
-        fitness_critics = None
+        fc = None
 
-        if self.use_fit_crit:
+        if self.use_fc:
 
             loss_fn = 0
 
@@ -701,7 +703,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 case "MSE+MAE":
                     loss_fn = 2
 
-            fitness_critics = [
+            fc = [
                 FitnessCritic(
                     device=DEVICE,
                     model_type=self.fit_crit_type,
@@ -713,7 +715,7 @@ class CooperativeCoevolutionaryAlgorithm:
                 for _ in range(self.num_rovers)
             ]
 
-        return fitness_critics
+        return fc
 
     def run(self):
 
@@ -733,21 +735,32 @@ class CooperativeCoevolutionaryAlgorithm:
                 checkpoint = pickle.load(handle)
                 pop = checkpoint["population"]
                 self.checkpoint_gen = checkpoint["gen"]
-                fitness_critics = checkpoint["fitness_critics"]
+                fitness_critics_params = checkpoint["fitness_critics"]
+            
+            #Load fitness critics params
+            if self.use_fc:
+                fitness_critics = self.init_fitness_critics()
+                for fc in fitness_critics:
+                    fc.model.set_params(fitness_critics_params)
+            else: 
+                fitness_critics = None
 
-        # Initialize the population
         else:
-
+            # Initialize the population
             pop = self.toolbox.population()
 
             # Create csv file for saving evaluation fitnesses
             self.createEvalFitnessCSV(trial_dir)
 
-            if self.use_fit_crit:
-                self.createFitCritLossCSV(trial_dir)
+            # Create csv file for saving fitness critic losses
+            self.createFitCritLossCSV(trial_dir)
 
-            # Init fitness critics
-            fitness_critics = self.init_fitness_critics()
+            #Initialize fitness critics
+            if self.use_fc:
+                fitness_critics = self.init_fitness_critics()
+            else: 
+                fitness_critics = None
+
 
         for n_gen in range(self.n_gens + 1):
 
@@ -775,9 +788,9 @@ class CooperativeCoevolutionaryAlgorithm:
             eval_infos = self.evaluateTeams(teams)
 
             # Train Fitness Critics
-            if self.use_fit_crit:
-                fit_crit_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
-                self.writeFitCritLossCSV(trial_dir, fit_crit_loss)
+            if self.use_fc:
+                fc_loss = self.trainFitnessCritics(fitness_critics, eval_infos)
+                self.writeFitCritLossCSV(trial_dir, fc_loss)
 
             # Regroup sets of teams with their respective sets of eval_infos
             grouped_teams, grouped_eval_infos = self.groupTeamsAndEvalInfos(teams, eval_infos)
@@ -807,7 +820,7 @@ class CooperativeCoevolutionaryAlgorithm:
                             "population": pop,
                             "gen": n_gen,
                             "fitness_critics": (
-                                [fit_crit.params for fit_crit in fitness_critics] if self.use_fit_crit else None
+                                [fc.params for fc in fitness_critics] if self.use_fc else None
                             ),
                         },
                         handle,
