@@ -436,13 +436,8 @@ class CooperativeCoevolutionaryAlgorithm:
         return [deepcopy(individual) for individual in offspring]
 
     def select(self, population):
-        # Offspring is a list of subpopulation
-        offspring = []
-        # For each subpopulation in the population
-        for subpop in population:
-            # Perform a selection on that subpopulation and add it to the offspring population
-            offspring.append(self.selectSubPopulation(subpop))
-        return offspring
+        # Perform a selection on that subpopulation and add it to the offspring population
+        return [self.selectSubPopulation(subpop) for subpop in population]
 
     def shuffle(self, population):
         for subpop in population:

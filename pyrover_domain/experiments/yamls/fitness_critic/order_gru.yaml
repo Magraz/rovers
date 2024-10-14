@@ -59,7 +59,7 @@ env:
     - type: ordered
       value: 4.0
       observation_radius: 3
-      coupling: 1
+      coupling: 2
       order: 2
       group: "A"
       lifespan: 0.20
